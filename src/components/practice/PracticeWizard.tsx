@@ -1,0 +1,710 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
+import { useApp } from '@/context/AppContext';
+import {
+  DifficultyCode,
+  PracticeFilters,
+  PracticeMode,
+  SubjectCode,
+} from '@/types';
+import { Button3D } from '@/components/ui/Button3D';
+import { soundEngine } from '@/services/sound/soundEngine';
+
+type WizardStep = 1 | 2;
+
+const DIFFICULTY_OPTIONS: Array<{
+  id: DifficultyCode;
+  label: string;
+  description: string;
+  dotColor: string;
+  activeBorder: string;
+  activeBg: string;
+  badgeColors: string;
+}> = [
+  {
+    id: 'E',
+    label: 'Easy',
+    description: 'Foundational concepts & direct application',
+    dotColor: 'bg-emerald-400',
+    activeBorder: 'border-emerald-500/50',
+    activeBg: 'bg-emerald-950/20',
+    badgeColors: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  },
+  {
+    id: 'M',
+    label: 'Medium',
+    description: 'Standard Digital SAT exam complexity',
+    dotColor: 'bg-amber-300',
+    activeBorder: 'border-amber-400/50',
+    activeBg: 'bg-amber-950/20',
+    badgeColors: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+  },
+  {
+    id: 'H',
+    label: 'Hard',
+    description: 'Multi-step reasoning & upper score band',
+    dotColor: 'bg-rose-400',
+    activeBorder: 'border-rose-500/50',
+    activeBg: 'bg-rose-950/20',
+    badgeColors: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
+  },
+];
+
+const ORDERED_DIFFICULTIES: DifficultyCode[] = ['E', 'M', 'H'];
+
+export function formatDifficultySelectionLabel(
+  selected: DifficultyCode[]
+): string {
+  if (selected.length === 0) {
+    return 'None selected';
+  }
+  if (selected.length === 3) {
+    return 'All Difficulties';
+  }
+  const ordered = ORDERED_DIFFICULTIES.filter((d) => selected.includes(d));
+  const labels = ordered.map(
+    (code) => DIFFICULTY_OPTIONS.find((o) => o.id === code)?.label || code
+  );
+  return labels.join(' + ');
+}
+
+export const PracticeWizard: React.FC = () => {
+  const { metas, taxonomy, startPracticeSession } = useApp();
+
+  const [step, setStep] = useState<WizardStep>(1);
+  const [subject, setSubject] = useState<SubjectCode>('rw');
+  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+
+  // Multi-select difficulties: default to all 3 ['E', 'M', 'H']
+  const [selectedDifficulties, setSelectedDifficulties] = useState<
+    DifficultyCode[]
+  >(['E', 'M', 'H']);
+
+  const [isStarting, setIsStarting] = useState<boolean>(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  const currentSubjectDomains = useMemo(() => {
+    if (!taxonomy) return [];
+    return subject === 'rw' ? taxonomy.rw : taxonomy.math;
+  }, [taxonomy, subject]);
+
+  const rwTotalCount = useMemo(() => {
+    if (!taxonomy) return 0;
+    return taxonomy.rw.reduce((acc, d) => acc + d.questionCount, 0);
+  }, [taxonomy]);
+
+  const mathTotalCount = useMemo(() => {
+    if (!taxonomy) return 0;
+    return taxonomy.math.reduce((acc, d) => acc + d.questionCount, 0);
+  }, [taxonomy]);
+
+  const handleSubjectSelect = (nextSubject: SubjectCode) => {
+    soundEngine.play('select');
+    if (nextSubject !== subject) {
+      setSubject(nextSubject);
+      setSelectedDomains([]);
+      setSelectedSkills([]);
+      setStartError(null);
+    }
+  };
+
+  // Questions matching the selected subject and selected skills (before difficulty filter)
+  const skillMatchingMetas = useMemo(() => {
+    if (selectedSkills.length === 0) return [];
+    return metas.filter((m) => {
+      if (m.subject !== subject) return false;
+      return (
+        selectedSkills.includes(m.skill) ||
+        selectedSkills.includes(m.skillLabel)
+      );
+    });
+  }, [metas, subject, selectedSkills]);
+
+  // Count per difficulty level for the selected skills
+  const difficultyCounts = useMemo(() => {
+    const counts: Record<DifficultyCode, number> = { E: 0, M: 0, H: 0 };
+    if (selectedSkills.length === 0) return counts;
+    for (const m of skillMatchingMetas) {
+      if (m.difficulty && counts[m.difficulty] !== undefined) {
+        counts[m.difficulty] += 1;
+      }
+    }
+    return counts;
+  }, [selectedSkills.length, skillMatchingMetas]);
+
+  // Total matching questions for selected skills + selected difficulties
+  const maxAvailableQuestions = useMemo(() => {
+    if (selectedSkills.length === 0 || selectedDifficulties.length === 0) {
+      return 0;
+    }
+    if (selectedDifficulties.length === 3) {
+      return skillMatchingMetas.length;
+    }
+    return skillMatchingMetas.filter(
+      (m) => m.difficulty && selectedDifficulties.includes(m.difficulty)
+    ).length;
+  }, [selectedSkills.length, selectedDifficulties, skillMatchingMetas]);
+
+  const currentFilters: PracticeFilters = useMemo(
+    () => ({
+      subject,
+      domains: selectedDomains,
+      skills: selectedSkills,
+      difficulties: selectedDifficulties,
+      difficulty:
+        selectedDifficulties.length === 1 ? selectedDifficulties[0] : 'ALL',
+    }),
+    [subject, selectedDomains, selectedSkills, selectedDifficulties]
+  );
+
+  const toggleDomain = (domainCode: string) => {
+    soundEngine.play('click');
+    setStartError(null);
+    const domainObj = currentSubjectDomains.find(
+      (d) => d.primaryClassCd === domainCode
+    );
+    const domainSkillCodes = domainObj
+      ? domainObj.skills.map((s) => s.code)
+      : [];
+
+    const allSkillsInDomainSelected =
+      domainSkillCodes.length > 0 &&
+      domainSkillCodes.every((code) => selectedSkills.includes(code));
+
+    if (allSkillsInDomainSelected && selectedDomains.includes(domainCode)) {
+      setSelectedDomains((prev) => prev.filter((d) => d !== domainCode));
+      setSelectedSkills((skPrev) =>
+        skPrev.filter((sk) => !domainSkillCodes.includes(sk))
+      );
+    } else {
+      setSelectedDomains((prev) =>
+        prev.includes(domainCode) ? prev : [...prev, domainCode]
+      );
+      setSelectedSkills((skPrev) =>
+        Array.from(new Set([...skPrev, ...domainSkillCodes]))
+      );
+    }
+  };
+
+  const toggleSkill = (skillCode: string, domainCode: string) => {
+    soundEngine.play('click');
+    setStartError(null);
+    const domainObj = currentSubjectDomains.find(
+      (d) => d.primaryClassCd === domainCode
+    );
+    const domainSkillCodes = domainObj
+      ? domainObj.skills.map((s) => s.code)
+      : [];
+
+    const exists = selectedSkills.includes(skillCode);
+    const nextSkills = exists
+      ? selectedSkills.filter((s) => s !== skillCode)
+      : [...selectedSkills, skillCode];
+
+    setSelectedSkills(nextSkills);
+
+    const hasAnySkillInDomain = domainSkillCodes.some((code) =>
+      nextSkills.includes(code)
+    );
+    if (hasAnySkillInDomain) {
+      setSelectedDomains((dPrev) =>
+        dPrev.includes(domainCode) ? dPrev : [...dPrev, domainCode]
+      );
+    } else {
+      setSelectedDomains((dPrev) => dPrev.filter((d) => d !== domainCode));
+    }
+  };
+
+  const handleToggleDifficulty = (diffCode: DifficultyCode) => {
+    soundEngine.play('select');
+    setStartError(null);
+    setSelectedDifficulties((prev) => {
+      const isSelected = prev.includes(diffCode);
+      if (isSelected) {
+        return ORDERED_DIFFICULTIES.filter(
+          (d) => d !== diffCode && prev.includes(d)
+        );
+      } else {
+        return ORDERED_DIFFICULTIES.filter(
+          (d) => d === diffCode || prev.includes(d)
+        );
+      }
+    });
+  };
+
+  // Must have at least 1 skill AND at least 1 difficulty selected
+  const hasValidSelection =
+    selectedSkills.length > 0 && selectedDifficulties.length > 0;
+
+  const canStartSession =
+    !isStarting && hasValidSelection && maxAvailableQuestions > 0;
+
+  const handleStartPractice = async () => {
+    if (!canStartSession) return;
+    setStartError(null);
+    setIsStarting(true);
+
+    try {
+      const mode: PracticeMode = 'custom';
+      const subjLabel = subject === 'rw' ? 'Reading & Writing' : 'Math';
+      let title = `${subjLabel} Practice`;
+
+      const activeDoms = currentSubjectDomains.filter((d) =>
+        selectedDomains.includes(d.primaryClassCd)
+      );
+      const allSkillsInActiveDomsSelected =
+        activeDoms.length > 0 &&
+        activeDoms.every((d) =>
+          d.skills.every((s) => selectedSkills.includes(s.code))
+        );
+
+      if (allSkillsInActiveDomsSelected) {
+        if (activeDoms.length === 1) {
+          title = activeDoms[0].text;
+        } else if (activeDoms.length < currentSubjectDomains.length) {
+          title = `${subjLabel} (${activeDoms.length} Domains)`;
+        }
+      } else if (selectedSkills.length === 1) {
+        for (const d of currentSubjectDomains) {
+          const sk = d.skills.find((s) => s.code === selectedSkills[0]);
+          if (sk) {
+            title = sk.text;
+            break;
+          }
+        }
+      } else if (selectedSkills.length > 1) {
+        title = `${subjLabel} (${selectedSkills.length} Skills)`;
+      }
+
+      soundEngine.play('select');
+      await startPracticeSession(currentFilters, mode, title);
+    } catch (err) {
+      setStartError(
+        err instanceof Error ? err.message : 'Unable to start practice session.'
+      );
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      {/* Subtle 2-Step Indicator Header */}
+      <div className="mb-8 flex items-center justify-between border-b border-[#1F1F23] pb-4">
+        <div className="flex items-center gap-3">
+          {([1, 2] as WizardStep[]).map((s) => {
+            const isCurrent = step === s;
+            const isPast = step > s;
+            const stepLabel =
+              s === 1 ? 'Choose Subject' : 'Choose Focus & Difficulty';
+            return (
+              <React.Fragment key={s}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (s < step) {
+                      soundEngine.play('click');
+                      setStep(s);
+                    }
+                  }}
+                  disabled={s > step}
+                  className={`inline-flex items-center gap-2 text-xs font-medium transition-colors ${
+                    isCurrent
+                      ? 'text-[#F5F5F5]'
+                      : isPast
+                      ? 'text-[#A1A1AA] hover:text-[#F5F5F5] cursor-pointer'
+                      : 'text-[#52525B] cursor-default'
+                  }`}
+                >
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full font-mono text-[11px] transition-colors ${
+                      isCurrent
+                        ? 'bg-[#F4F0EA] text-[#0A0A0B] font-semibold'
+                        : isPast
+                        ? 'bg-[#202024] text-[#F5F5F5]'
+                        : 'bg-[#141417] text-[#52525B]'
+                    }`}
+                  >
+                    {isPast ? <Check className="h-3 w-3" /> : s}
+                  </span>
+                  <span className="hidden sm:inline">{stepLabel}</span>
+                </button>
+                {s < 2 && <span className="text-[#29292E] text-xs">/</span>}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        <span className="font-mono text-xs text-[#71717A]">
+          Step {step} of 2
+        </span>
+      </div>
+
+      {/* Step 1: Choose Subject */}
+      {step === 1 && (
+        <div className="space-y-8">
+          <div>
+            <p className="text-xs font-medium text-[#D6CEBF]">Step 1</p>
+            <h1 className="mt-1 font-editorial text-3xl sm:text-4xl text-[#F5F5F5] tracking-tight">
+              What do you want to practice?
+            </h1>
+            <p className="mt-2 text-sm text-[#A1A1AA]">
+              Choose one official Digital SAT section to begin.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Reading & Writing Card */}
+            <button
+              type="button"
+              onClick={() => handleSubjectSelect('rw')}
+              className={`group text-left rounded-2xl border p-6 transition-all duration-150 cursor-pointer ${
+                subject === 'rw'
+                  ? 'border-[#F4F0EA] bg-[#18181B]'
+                  : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] hover:bg-[#18181B]/60'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-[#A1A1AA]">
+                  SECTION 01
+                </span>
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
+                    subject === 'rw'
+                      ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                      : 'border-[#3F3F46]'
+                  }`}
+                >
+                  {subject === 'rw' && <Check className="h-3 w-3 stroke-[2.5]" />}
+                </span>
+              </div>
+              <h2 className="mt-4 font-editorial text-3xl text-[#F5F5F5]">
+                Reading &amp; Writing
+              </h2>
+              <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
+                Information and Ideas, Craft and Structure, Expression of Ideas,
+                and Standard English Conventions.
+              </p>
+              <div className="mt-6 pt-4 border-t border-[#1F1F23] flex items-center justify-between text-xs text-[#71717A]">
+                <span>4 official domains</span>
+                <span className="font-mono text-[#A1A1AA]">
+                  {rwTotalCount.toLocaleString()} questions
+                </span>
+              </div>
+            </button>
+
+            {/* Math Card */}
+            <button
+              type="button"
+              onClick={() => handleSubjectSelect('math')}
+              className={`group text-left rounded-2xl border p-6 transition-all duration-150 cursor-pointer ${
+                subject === 'math'
+                  ? 'border-[#F4F0EA] bg-[#18181B]'
+                  : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] hover:bg-[#18181B]/60'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-[#A1A1AA]">
+                  SECTION 02
+                </span>
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
+                    subject === 'math'
+                      ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                      : 'border-[#3F3F46]'
+                  }`}
+                >
+                  {subject === 'math' && (
+                    <Check className="h-3 w-3 stroke-[2.5]" />
+                  )}
+                </span>
+              </div>
+              <h2 className="mt-4 font-editorial text-3xl text-[#F5F5F5]">
+                Math
+              </h2>
+              <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
+                Algebra, Advanced Math, Problem-Solving and Data Analysis, and
+                Geometry and Trigonometry.
+              </p>
+              <div className="mt-6 pt-4 border-t border-[#1F1F23] flex items-center justify-between text-xs text-[#71717A]">
+                <span>4 official domains</span>
+                <span className="font-mono text-[#A1A1AA]">
+                  {mathTotalCount.toLocaleString()} questions
+                </span>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end border-t border-[#1F1F23] pt-6">
+            <Button3D
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                soundEngine.play('click');
+                setStep(2);
+              }}
+            >
+              <span>Continue</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button3D>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Choose Your Focus & Difficulty */}
+      {step === 2 && (
+        <div className="space-y-8">
+          <div>
+            <p className="text-xs font-medium text-[#D6CEBF]">
+              Step 2 • {subject === 'rw' ? 'Reading & Writing' : 'Math'}
+            </p>
+            <h1 className="mt-1 font-editorial text-3xl sm:text-4xl text-[#F5F5F5] tracking-tight">
+              Choose your focus &amp; difficulty
+            </h1>
+            <p className="mt-1.5 text-sm text-[#A1A1AA]">
+              Select at least one skill and one difficulty level to start
+              continuous practice.
+            </p>
+          </div>
+
+          {/* Domains & Skills Selection */}
+          <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113]">
+            {currentSubjectDomains.map((dom) => {
+              const activeSkillsInDom = dom.skills.filter((s) =>
+                selectedSkills.includes(s.code)
+              );
+              const isAllDomSkillsSelected =
+                dom.skills.length > 0 &&
+                activeSkillsInDom.length === dom.skills.length;
+              const isSomeDomSkillsSelected = activeSkillsInDom.length > 0;
+
+              return (
+                <div key={dom.primaryClassCd} className="p-5 sm:p-6">
+                  <div
+                    onClick={() => toggleDomain(dom.primaryClassCd)}
+                    className="flex items-start justify-between gap-4 cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                          isAllDomSkillsSelected
+                            ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                            : isSomeDomSkillsSelected
+                            ? 'border-[#F4F0EA] bg-[#18181B] text-[#F4F0EA]'
+                            : 'border-[#3F3F46] bg-[#18181B]'
+                        }`}
+                      >
+                        {isSomeDomSkillsSelected && (
+                          <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-base font-medium text-[#F5F5F5]">
+                          {dom.text}
+                        </div>
+                        <div className="mt-0.5 text-xs text-[#71717A]">
+                          {dom.skills.length} skills •{' '}
+                          <span className="font-mono">
+                            {dom.questionCount}
+                          </span>{' '}
+                          questions
+                          {activeSkillsInDom.length > 0 && (
+                            <span className="ml-2 text-[#D6CEBF]">
+                              ({activeSkillsInDom.length} skill
+                              {activeSkillsInDom.length > 1 ? 's' : ''} selected)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 ml-8 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {dom.skills.map((sk) => {
+                      const isSkSelected = selectedSkills.includes(sk.code);
+                      return (
+                        <button
+                          key={sk.id}
+                          type="button"
+                          onClick={() =>
+                            toggleSkill(sk.code, dom.primaryClassCd)
+                          }
+                          className={`flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left text-xs transition-colors cursor-pointer ${
+                            isSkSelected
+                              ? 'border-[#F4F0EA] bg-[#18181B] text-[#F5F5F5]'
+                              : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
+                          }`}
+                        >
+                          <span className="line-clamp-1">{sk.text}</span>
+                          <span className="font-mono text-[11px] text-[#71717A] shrink-0">
+                            {sk.questionCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Redesigned Question Difficulty Checkboxes Section */}
+          <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-5 sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-base font-medium text-[#F5F5F5]">
+                Question Difficulty
+              </h2>
+              <p className="text-xs text-[#71717A] mt-0.5">
+                Select one or more difficulty tiers to include in your session
+              </p>
+            </div>
+
+            <div
+              role="group"
+              aria-label="Difficulty levels"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+            >
+              {DIFFICULTY_OPTIONS.map((d) => {
+                const isSelected = selectedDifficulties.includes(d.id);
+                const countForDiff = difficultyCounts[d.id] || 0;
+
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isSelected}
+                    onClick={() => handleToggleDifficulty(d.id)}
+                    className={`group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? 'border-[#F4F0EA] bg-[#18181B] shadow-[0_0_0_1px_rgba(244,240,234,0.12)]'
+                        : 'border-[#29292E] bg-[#0A0A0B] hover:border-[#3F3F46] hover:bg-[#141417]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 w-full">
+                      <div className="flex items-center gap-2.5">
+                        {/* Refined Custom Checkbox */}
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all duration-150 ${
+                            isSelected
+                              ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                              : 'border-[#3F3F46] bg-[#111113] group-hover:border-[#52525B]'
+                          }`}
+                        >
+                          {isSelected && (
+                            <Check className="h-3.5 w-3.5 stroke-[2.75]" />
+                          )}
+                        </span>
+
+                        <span
+                          className={`text-sm font-medium transition-colors ${
+                            isSelected
+                              ? 'text-[#F5F5F5]'
+                              : 'text-[#A1A1AA] group-hover:text-[#F5F5F5]'
+                          }`}
+                        >
+                          {d.label}
+                        </span>
+                      </div>
+
+                      {selectedSkills.length > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 font-mono text-[11px] text-[#A1A1AA]">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${d.dotColor}`}
+                          />
+                          <span>{countForDiff}</span>
+                        </span>
+                      ) : (
+                        <span
+                          className={`h-2 w-2 rounded-full ${d.dotColor}`}
+                        />
+                      )}
+                    </div>
+
+                    <p className="mt-2.5 text-[11.5px] leading-snug text-[#71717A]">
+                      {d.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Inline Warning when skills + difficulties selected but 0 matching questions */}
+          {hasValidSelection && maxAvailableQuestions === 0 && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                No questions match this exact combination of skills and
+                difficulty. Try selecting additional difficulty levels or
+                skills.
+              </div>
+            </div>
+          )}
+
+          {startError && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+              <span>{startError}</span>
+            </div>
+          )}
+
+          {/* Direct Start Practice! Action */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#1F1F23] pt-6">
+            <Button3D
+              variant="ghost"
+              size="md"
+              onClick={() => {
+                soundEngine.play('click');
+                setStep(1);
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </Button3D>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <span className="text-xs text-[#71717A]">
+                {!hasValidSelection ? (
+                  'Select at least 1 skill and 1 difficulty to begin'
+                ) : (
+                  <span>
+                    <strong className="font-mono text-[#F5F5F5]">
+                      {maxAvailableQuestions.toLocaleString()}
+                    </strong>{' '}
+                    matching questions ready
+                  </span>
+                )}
+              </span>
+
+              <Button3D
+                variant="primary"
+                size="lg"
+                disabled={!canStartSession}
+                onClick={handleStartPractice}
+                className="px-7"
+              >
+                {isStarting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Starting...</span>
+                  </>
+                ) : (
+                  <span>Start Practice!</span>
+                )}
+              </Button3D>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
