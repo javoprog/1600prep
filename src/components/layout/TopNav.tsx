@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { soundEngine } from '@/services/sound/soundEngine';
 
 export const TopNav: React.FC = () => {
@@ -25,7 +26,7 @@ export const TopNav: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        {/* Editorial Brand Wordmark */}
+        {/* Editorial Brand Mark & Wordmark */}
         <Link
           href="/"
           onClick={() => {
@@ -34,11 +35,9 @@ export const TopNav: React.FC = () => {
               closeActiveSession();
             }
           }}
-          className="group flex items-baseline focus:outline-none"
+          className="group flex items-center focus:outline-none"
         >
-          <span className="font-editorial text-2xl tracking-tight text-[#F5F5F5] transition-opacity group-hover:opacity-90">
-            1600prep
-          </span>
+          <BrandLogo />
         </Link>
 
         {/* Right Controls: Sound Toggle */}

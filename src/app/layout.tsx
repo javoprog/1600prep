@@ -39,7 +39,7 @@ export default function RootLayout({
       lang="en"
       className={`dark ${inter.variable} ${outfit.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="bg-[#0A0A0B] text-[#F5F5F5] antialiased selection:bg-[#F4F0EA]/20 selection:text-[#F5F5F5]">
+      <body className="bg-[#0A0A0B] text-[#F5F5F5] antialiased selection:bg-[#69ff00]/25 selection:text-[#F5F5F5]">
         <AppProvider>
           <div className="flex min-h-screen flex-col">
             <TopNav />

@@ -112,7 +112,7 @@ export const SessionSummary: React.FC = () => {
           </div>
 
           <div className="sm:text-right">
-            <div className="font-editorial text-5xl text-[#F4F0EA]">
+            <div className="font-editorial text-5xl text-[#69ff00]">
               {accuracy}%
             </div>
             <div className="text-xs text-[#71717A] mt-0.5">Session Accuracy</div>

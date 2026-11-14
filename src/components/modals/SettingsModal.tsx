@@ -112,7 +112,7 @@ export const SettingsModal: React.FC = () => {
                   }
                 }}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-[#29292E] transition-colors duration-150 ${
-                  settings.soundEnabled ? 'bg-[#F4F0EA]' : 'bg-[#18181B]'
+                  settings.soundEnabled ? 'bg-[#69ff00]' : 'bg-[#18181B]'
                 }`}
               >
                 <span
@@ -144,7 +144,7 @@ export const SettingsModal: React.FC = () => {
                   updateSettings({ soundVolume: val });
                   soundEngine.play('select');
                 }}
-                className="w-full accent-[#F4F0EA] cursor-pointer disabled:opacity-40"
+                className="w-full accent-[#69ff00] cursor-pointer disabled:opacity-40"
               />
             </div>
           </div>
@@ -195,7 +195,7 @@ export const SettingsModal: React.FC = () => {
                       }}
                       className={`flex-1 rounded-lg py-2 px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer ${
                         isSelected
-                          ? 'bg-[#F4F0EA] text-[#0A0A0B] shadow-sm'
+                          ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold shadow-sm'
                           : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
                       }`}
                     >
@@ -222,7 +222,7 @@ export const SettingsModal: React.FC = () => {
                     }}
                     className={`flex-1 rounded-lg py-2 font-mono text-xs font-medium transition-all duration-150 cursor-pointer ${
                       settings.defaultQuestionCount === cnt
-                        ? 'bg-[#F4F0EA] text-[#0A0A0B] shadow-sm'
+                        ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold shadow-sm'
                         : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
                     }`}
                   >

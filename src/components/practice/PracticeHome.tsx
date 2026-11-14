@@ -24,7 +24,7 @@ export const PracticeHome: React.FC = () => {
   if (isCatalogLoading && !taxonomy) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-28 sm:px-6 flex flex-col items-center justify-center text-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[#F4F0EA]" />
+        <Loader2 className="h-6 w-6 animate-spin text-[#69ff00]" />
         <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
           Loading SAT Question Bank
         </h2>

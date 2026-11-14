@@ -328,7 +328,7 @@ export const PracticeWizard: React.FC = () => {
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-full font-mono text-[11px] transition-colors ${
                       isCurrent
-                        ? 'bg-[#F4F0EA] text-[#0A0A0B] font-semibold'
+                        ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
                         : isPast
                         ? 'bg-[#202024] text-[#F5F5F5]'
                         : 'bg-[#141417] text-[#52525B]'
@@ -369,7 +369,7 @@ export const PracticeWizard: React.FC = () => {
               onClick={() => handleSubjectSelect('rw')}
               className={`group text-left rounded-2xl border p-6 transition-all duration-150 cursor-pointer ${
                 subject === 'rw'
-                  ? 'border-[#F4F0EA] bg-[#18181B]'
+                  ? 'border-[#69ff00] bg-[#18181B]'
                   : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] hover:bg-[#18181B]/60'
               }`}
             >
@@ -380,7 +380,7 @@ export const PracticeWizard: React.FC = () => {
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
                     subject === 'rw'
-                      ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                      ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                       : 'border-[#3F3F46]'
                   }`}
                 >
@@ -408,7 +408,7 @@ export const PracticeWizard: React.FC = () => {
               onClick={() => handleSubjectSelect('math')}
               className={`group text-left rounded-2xl border p-6 transition-all duration-150 cursor-pointer ${
                 subject === 'math'
-                  ? 'border-[#F4F0EA] bg-[#18181B]'
+                  ? 'border-[#69ff00] bg-[#18181B]'
                   : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] hover:bg-[#18181B]/60'
               }`}
             >
@@ -419,7 +419,7 @@ export const PracticeWizard: React.FC = () => {
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
                     subject === 'math'
-                      ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                      ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                       : 'border-[#3F3F46]'
                   }`}
                 >
@@ -497,9 +497,9 @@ export const PracticeWizard: React.FC = () => {
                       <div
                         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                           isAllDomSkillsSelected
-                            ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                            ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                             : isSomeDomSkillsSelected
-                            ? 'border-[#F4F0EA] bg-[#18181B] text-[#F4F0EA]'
+                            ? 'border-[#69ff00] bg-[#18181B] text-[#69ff00]'
                             : 'border-[#3F3F46] bg-[#18181B]'
                         }`}
                       >
@@ -540,7 +540,7 @@ export const PracticeWizard: React.FC = () => {
                           }
                           className={`flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left text-xs transition-colors cursor-pointer ${
                             isSkSelected
-                              ? 'border-[#F4F0EA] bg-[#18181B] text-[#F5F5F5]'
+                              ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5]'
                               : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
                           }`}
                         >
@@ -586,7 +586,7 @@ export const PracticeWizard: React.FC = () => {
                     onClick={() => handleToggleDifficulty(d.id)}
                     className={`group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150 cursor-pointer ${
                       isSelected
-                        ? 'border-[#F4F0EA] bg-[#18181B] shadow-[0_0_0_1px_rgba(244,240,234,0.12)]'
+                        ? 'border-[#69ff00]/75 bg-[#18181B]'
                         : 'border-[#29292E] bg-[#0A0A0B] hover:border-[#3F3F46] hover:bg-[#141417]'
                     }`}
                   >
@@ -596,7 +596,7 @@ export const PracticeWizard: React.FC = () => {
                         <span
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all duration-150 ${
                             isSelected
-                              ? 'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B]'
+                              ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                               : 'border-[#3F3F46] bg-[#111113] group-hover:border-[#52525B]'
                           }`}
                         >

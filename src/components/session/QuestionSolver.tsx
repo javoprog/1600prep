@@ -24,6 +24,7 @@ import { useApp } from '@/context/AppContext';
 import { fetchQuestionDetail } from '@/services/questionBank';
 import { Question } from '@/types';
 import { RichMathContent } from '@/components/question/RichMathContent';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Button3D } from '@/components/ui/Button3D';
 import {
   MathCalculatorPanel,
@@ -360,7 +361,7 @@ export const QuestionSolver: React.FC = () => {
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          {/* Left: 1600prep Brand Wordmark (serves as Exit button) */}
+          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button) */}
           <div className="flex items-center">
             <button
               type="button"
@@ -368,12 +369,10 @@ export const QuestionSolver: React.FC = () => {
                 soundEngine.play('click');
                 closeActiveSession();
               }}
-              className="group flex items-baseline cursor-pointer focus:outline-none"
+              className="group flex items-center cursor-pointer focus:outline-none"
               title="Return to main menu"
             >
-              <span className="font-editorial text-2xl tracking-tight text-[#F5F5F5] transition-opacity group-hover:opacity-90">
-                1600prep
-              </span>
+              <BrandLogo />
             </button>
           </div>
 
@@ -419,7 +418,7 @@ export const QuestionSolver: React.FC = () => {
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                     isCalculatorOpen
-                      ? 'bg-[#18181B] text-[#F4F0EA]'
+                      ? 'bg-[#18181B] text-[#69ff00]'
                       : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
                   }`}
                   title="Graphing Calculator"
@@ -441,7 +440,7 @@ export const QuestionSolver: React.FC = () => {
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                     isReferenceOpen
-                      ? 'bg-[#18181B] text-[#F4F0EA]'
+                      ? 'bg-[#18181B] text-[#69ff00]'
                       : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
                   }`}
                   title="Math Reference Sheet"
@@ -460,7 +459,7 @@ export const QuestionSolver: React.FC = () => {
               onClick={handleToggleScratchpad}
               className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                 isScratchpadOpen
-                  ? 'bg-[#18181B] text-[#F4F0EA]'
+                  ? 'bg-[#18181B] text-[#69ff00]'
                   : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
               }`}
               title="Toggle Scratchpad"
@@ -477,7 +476,7 @@ export const QuestionSolver: React.FC = () => {
               onClick={handleToggleCheatSheet}
               className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
                 isCheatSheetOpen
-                  ? 'bg-[#18181B] text-[#F4F0EA]'
+                  ? 'bg-[#18181B] text-[#69ff00]'
                   : 'text-[#71717A] hover:text-[#F5F5F5]'
               }`}
               title="Keyboard shortcuts"
@@ -555,7 +554,7 @@ export const QuestionSolver: React.FC = () => {
         >
         {isLoadingQuestion ? (
           <div className="flex flex-1 flex-col items-center justify-center py-24">
-            <Loader2 className="h-6 w-6 animate-spin text-[#F4F0EA]" />
+            <Loader2 className="h-6 w-6 animate-spin text-[#69ff00]" />
             <p className="mt-3 text-xs text-[#71717A]">
               Loading question {currentIdx + 1}...
             </p>
@@ -611,7 +610,7 @@ export const QuestionSolver: React.FC = () => {
               <div>
                 <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#1F1F23] pb-3">
                   <div className="flex items-center gap-2 min-w-0 flex-1 text-xs">
-                    <span className="flex h-6 min-w-[1.5rem] shrink-0 px-1.5 items-center justify-center rounded bg-[#F4F0EA] font-mono text-xs font-semibold text-[#0A0A0B]">
+                    <span className="flex h-6 min-w-[1.5rem] shrink-0 px-1.5 items-center justify-center rounded bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
                       {currentIdx + 1}
                     </span>
 
@@ -710,9 +709,9 @@ export const QuestionSolver: React.FC = () => {
                       badgeStyle =
                         'border-[#29292E] bg-[#141417] text-[#52525B]';
                     } else if (isSelected) {
-                      optionSurface = 'border-[#F4F0EA] bg-[#18181B]';
+                      optionSurface = 'border-[#69ff00]/80 bg-[#18181B]';
                       badgeStyle =
-                        'border-[#F4F0EA] bg-[#F4F0EA] text-[#0A0A0B] font-semibold';
+                        'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B] font-semibold';
                     }
 
                     return (
@@ -814,8 +813,8 @@ export const QuestionSolver: React.FC = () => {
                           ? 'border-emerald-500/50 bg-[#101F18] text-[#F5F5F5]'
                           : 'border-red-500/50 bg-[#221215] text-[#F5F5F5]'
                         : currentQuestionState.draftAnswer.trim()
-                        ? 'border-[#F4F0EA] bg-[#18181B]'
-                        : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] focus-within:border-[#F4F0EA] focus-within:bg-[#18181B]'
+                        ? 'border-[#69ff00]/75 bg-[#18181B]'
+                        : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] focus-within:border-[#69ff00] focus-within:bg-[#18181B]'
                     }`}
                   >
                     <input

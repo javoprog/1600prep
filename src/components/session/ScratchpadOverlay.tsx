@@ -349,7 +349,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
             }}
             className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer ${
               activeTool === 'pen'
-                ? 'bg-[#F4F0EA] text-[#0A0A0B] font-semibold'
+                ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
                 : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
             }`}
             title="Pen"
@@ -367,7 +367,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
             }}
             className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer ${
               activeTool === 'eraser'
-                ? 'bg-[#F4F0EA] text-[#0A0A0B] font-semibold'
+                ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
                 : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
             }`}
             title="Eraser"
