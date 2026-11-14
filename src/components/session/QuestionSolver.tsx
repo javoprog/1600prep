@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  PenTool,
   RefreshCw,
   Share2,
   Undo2,
@@ -29,6 +30,12 @@ import {
   MathReferenceSheet,
   SprDirectionsWindow,
 } from '@/components/session/MathTools';
+import {
+  ScratchpadOverlay,
+  ScratchpadStroke,
+} from '@/components/session/ScratchpadOverlay';
+import { ShortcutCheatSheetModal } from '@/components/session/ShortcutCheatSheetModal';
+import { usePracticeShortcuts } from '@/hooks/usePracticeShortcuts';
 import {
   formatDuration,
   formatShortDuration,
@@ -53,6 +60,9 @@ export const QuestionSolver: React.FC = () => {
   const [isLoadingQuestion, setIsLoadingQuestion] = useState<boolean>(true);
   const [questionError, setQuestionError] = useState<string | null>(null);
   const [eliminatedMap, setEliminatedMap] = useState<Record<string, string[]>>({});
+  const [scratchpadMap, setScratchpadMap] = useState<Record<string, ScratchpadStroke[]>>({});
+  const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
+  const [isCheatSheetOpen, setIsCheatSheetOpen] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
@@ -186,151 +196,84 @@ export const QuestionSolver: React.FC = () => {
     await submitAnswer(question);
   }, [question, currentQuestionState, submitAnswer]);
 
-  // Keyboard shortcuts for fast, ergonomic problem solving
-  useEffect(() => {
-    if (!activeSession || !currentQuestionId || !currentQuestionState) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      const target = e.target as HTMLElement | null;
-      const isInputFocused =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable;
-
-      // Escape closes floating windows
-      if (e.key === 'Escape') {
-        if (isSprDirectionsOpen) {
-          setIsSprDirectionsOpen(false);
-          return;
-        }
-        if (isReferenceOpen) {
-          setIsReferenceOpen(false);
-          return;
-        }
-        if (isCalculatorOpen) {
-          setIsCalculatorOpen(false);
-          return;
-        }
-      }
-
-      // Enter checks the answer if selected, or moves to next question if already submitted
-      if (e.key === 'Enter') {
-        if (target?.tagName === 'BUTTON' || target?.tagName === 'A') return;
-        if (
-          !currentQuestionState.isSubmitted &&
-          currentQuestionState.draftAnswer.trim()
-        ) {
-          e.preventDefault();
-          handleSubmit();
-          return;
-        }
-        if (
-          currentQuestionState.isSubmitted &&
-          currentIdx < totalQuestions - 1
-        ) {
-          e.preventDefault();
-          soundEngine.play('click');
-          goToQuestionIndex(currentIdx + 1);
-          return;
-        }
-      }
-
-      // Left / Right arrows navigate between questions (unless editing non-empty text in an input)
-      if (e.key === 'ArrowLeft') {
-        if (
-          isInputFocused &&
-          !currentQuestionState.isSubmitted &&
-          currentQuestionState.draftAnswer.length > 0
-        ) {
-          return;
-        }
-        if (currentIdx > 0) {
-          e.preventDefault();
-          soundEngine.play('click');
-          goToQuestionIndex(currentIdx - 1);
-        }
+  const handleToggleEliminateOption = useCallback(
+    (label: string) => {
+      if (!currentQuestionId || !currentQuestionState || currentQuestionState.isSubmitted) {
         return;
       }
-
-      if (e.key === 'ArrowRight') {
-        if (
-          isInputFocused &&
-          !currentQuestionState.isSubmitted &&
-          currentQuestionState.draftAnswer.length > 0
-        ) {
-          return;
-        }
-        if (currentIdx < totalQuestions - 1) {
-          e.preventDefault();
-          soundEngine.play('click');
-          goToQuestionIndex(currentIdx + 1);
-        }
-        return;
+      soundEngine.play('click');
+      const currentElim = eliminatedMap[currentQuestionId] || [];
+      const isNowEliminating = !currentElim.includes(label);
+      setEliminatedMap((prev) => {
+        const current = prev[currentQuestionId] || [];
+        const next = current.includes(label)
+          ? current.filter((l) => l !== label)
+          : [...current, label];
+        return { ...prev, [currentQuestionId]: next };
+      });
+      if (isNowEliminating && currentQuestionState.draftAnswer === label) {
+        setDraftAnswer(currentQuestionId, '');
       }
+    },
+    [currentQuestionId, currentQuestionState, eliminatedMap, setDraftAnswer]
+  );
 
-      // MCQ option shortcuts: A/B/C/D or 1/2/3/4 (and Shift + A/B/C/D to cross out)
-      if (
-        !isInputFocused &&
-        question?.questionType === 'mcq' &&
-        !currentQuestionState.isSubmitted
-      ) {
-        const keyMap: Record<string, 'A' | 'B' | 'C' | 'D'> = {
-          a: 'A',
-          b: 'B',
-          c: 'C',
-          d: 'D',
-          '1': 'A',
-          '2': 'B',
-          '3': 'C',
-          '4': 'D',
-        };
-        const mapped = keyMap[e.key.toLowerCase()];
-        if (mapped) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            soundEngine.play('click');
-            const currentElim = eliminatedMap[currentQuestionId] || [];
-            const isNowEliminating = !currentElim.includes(mapped);
-            setEliminatedMap((prev) => {
-              const current = prev[currentQuestionId] || [];
-              const next = current.includes(mapped)
-                ? current.filter((l) => l !== mapped)
-                : [...current, mapped];
-              return { ...prev, [currentQuestionId]: next };
-            });
-            if (
-              isNowEliminating &&
-              currentQuestionState.draftAnswer === mapped
-            ) {
-              setDraftAnswer(currentQuestionId, '');
-            }
-          } else {
-            handleSelectMcq(mapped);
-          }
-        }
-      }
-    };
+  const handleUpdateScratchpadStrokes = useCallback(
+    (qId: string, nextStrokes: ScratchpadStroke[]) => {
+      setScratchpadMap((prev) => ({
+        ...prev,
+        [qId]: nextStrokes,
+      }));
+    },
+    []
+  );
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+  const handleEscapeOverlays = useCallback((): boolean => {
+    if (isCheatSheetOpen) {
+      setIsCheatSheetOpen(false);
+      return true;
+    }
+    if (isScratchpadOpen) {
+      setIsScratchpadOpen(false);
+      return true;
+    }
+    if (isSprDirectionsOpen) {
+      setIsSprDirectionsOpen(false);
+      return true;
+    }
+    if (isReferenceOpen) {
+      setIsReferenceOpen(false);
+      return true;
+    }
+    if (isCalculatorOpen) {
+      setIsCalculatorOpen(false);
+      return true;
+    }
+    return false;
   }, [
-    activeSession,
-    currentQuestionId,
-    currentQuestionState,
-    currentIdx,
-    totalQuestions,
-    question?.questionType,
+    isCheatSheetOpen,
+    isScratchpadOpen,
     isSprDirectionsOpen,
     isReferenceOpen,
     isCalculatorOpen,
-    eliminatedMap,
-    setDraftAnswer,
-    goToQuestionIndex,
-    handleSelectMcq,
-    handleSubmit,
   ]);
+
+  usePracticeShortcuts({
+    enabled: Boolean(activeSession && currentQuestionId && currentQuestionState),
+    isMcq: question?.questionType === 'mcq',
+    isSubmitted: Boolean(currentQuestionState?.isSubmitted),
+    hasDraftAnswer: Boolean(currentQuestionState?.draftAnswer.trim()),
+    canGoPrev: currentIdx > 0,
+    canGoNext: currentIdx < totalQuestions - 1,
+    onSelectOption: handleSelectMcq,
+    onToggleEliminateOption: handleToggleEliminateOption,
+    onSubmitAnswer: handleSubmit,
+    onPrevQuestion: () => goToQuestionIndex(currentIdx - 1),
+    onNextQuestion: () => goToQuestionIndex(currentIdx + 1),
+    onToggleScratchpad: () => setIsScratchpadOpen((prev) => !prev),
+    onToggleCheatSheet: () => setIsCheatSheetOpen((prev) => !prev),
+    onEscape: handleEscapeOverlays,
+  });
 
   if (!activeSession || !currentQuestionId || !currentQuestionState) {
     return null;
@@ -348,18 +291,7 @@ export const QuestionSolver: React.FC = () => {
 
   const toggleEliminateOption = (label: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    soundEngine.play('click');
-    const isNowEliminating = !eliminatedForCurrent.includes(label);
-    setEliminatedMap((prev) => {
-      const current = prev[currentQuestionId] || [];
-      const next = current.includes(label)
-        ? current.filter((l) => l !== label)
-        : [...current, label];
-      return { ...prev, [currentQuestionId]: next };
-    });
-    if (isNowEliminating && currentQuestionState.draftAnswer === label) {
-      setDraftAnswer(currentQuestionId, '');
-    }
+    handleToggleEliminateOption(label);
   };
 
   const handleSprChange = (val: string) => {
@@ -456,8 +388,8 @@ export const QuestionSolver: React.FC = () => {
             </button>
           </div>
 
-          {/* Right: Math Tools (Calculator & Reference) + Icon-Only Share Button */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Right: Math Tools (Calculator & Reference) + Scratchpad + Shortcuts + Share */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {isMathSubject && (
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
@@ -500,6 +432,48 @@ export const QuestionSolver: React.FC = () => {
               </div>
             )}
 
+            {/* Scratchpad Toggle Button (S) */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('click');
+                setIsScratchpadOpen((prev) => !prev);
+              }}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                isScratchpadOpen
+                  ? 'bg-[#18181B] text-[#F4F0EA]'
+                  : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+              }`}
+              title="Toggle Scratchpad (S)"
+              aria-label="Toggle Scratchpad"
+              aria-pressed={isScratchpadOpen}
+            >
+              <PenTool className="h-4 w-4" />
+              <span className="hidden md:inline">Scratchpad</span>
+              <kbd className="hidden lg:inline font-mono text-[10px] text-[#71717A]">
+                S
+              </kbd>
+            </button>
+
+            {/* Keyboard Shortcut Cheat-Sheet Button (?) */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('click');
+                setIsCheatSheetOpen((prev) => !prev);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
+                isCheatSheetOpen
+                  ? 'bg-[#18181B] text-[#F4F0EA]'
+                  : 'text-[#71717A] hover:text-[#F5F5F5]'
+              }`}
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+              aria-pressed={isCheatSheetOpen}
+            >
+              ?
+            </button>
+
             {/* Icon-only Share Question Link Button without background or text */}
             <button
               type="button"
@@ -518,7 +492,7 @@ export const QuestionSolver: React.FC = () => {
         </div>
       </header>
 
-      {/* Floating SAT Math Calculator, Reference Sheet & SPR Directions Windows */}
+      {/* Floating SAT Math Calculator, Reference Sheet, SPR Directions & Shortcut Cheat-Sheet Windows */}
       {isMathSubject && (
         <>
           <MathCalculatorPanel
@@ -535,9 +509,21 @@ export const QuestionSolver: React.FC = () => {
         isOpen={isSprDirectionsOpen}
         onClose={() => setIsSprDirectionsOpen(false)}
       />
+      <ShortcutCheatSheetModal
+        isOpen={isCheatSheetOpen}
+        onClose={() => setIsCheatSheetOpen(false)}
+      />
 
       {/* Dedicated Examination Workspace */}
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10">
+      <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10">
+        {/* Transparent HTML5 Canvas Scratchpad Overlay */}
+        <ScratchpadOverlay
+          isOpen={isScratchpadOpen}
+          questionId={currentQuestionId}
+          strokes={scratchpadMap[currentQuestionId] || []}
+          onChangeStrokes={handleUpdateScratchpadStrokes}
+          onClose={() => setIsScratchpadOpen(false)}
+        />
         {isLoadingQuestion ? (
           <div className="flex flex-1 flex-col items-center justify-center py-24">
             <Loader2 className="h-6 w-6 animate-spin text-[#F4F0EA]" />
@@ -731,7 +717,7 @@ export const QuestionSolver: React.FC = () => {
 
                         <div
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-mono text-xs transition-all ${badgeStyle} ${
-                            isEliminated ? 'opacity-35' : ''
+                            isEliminated ? 'opacity-40 line-through' : ''
                           }`}
                         >
                           {opt.label}
@@ -740,7 +726,7 @@ export const QuestionSolver: React.FC = () => {
                         <div
                           className={`flex-1 transition-opacity ${
                             isEliminated
-                              ? 'opacity-30 grayscale select-none'
+                              ? 'opacity-40 line-through grayscale select-none'
                               : ''
                           }`}
                         >
@@ -764,18 +750,18 @@ export const QuestionSolver: React.FC = () => {
                             }
                             title={
                               isEliminated
-                                ? `Restore answer choice ${opt.label}`
-                                : `Cross out answer choice ${opt.label}`
+                                ? `Restore answer choice ${opt.label} (Shift+${opt.label})`
+                                : `Cross out answer choice ${opt.label} (Shift+${opt.label})`
                             }
                             aria-label={
                               isEliminated
                                 ? `Restore answer choice ${opt.label}`
                                 : `Cross out answer choice ${opt.label}`
                             }
-                            className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors cursor-pointer ${
+                            className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all cursor-pointer ${
                               isEliminated
-                                ? 'text-[#F4F0EA] hover:bg-[#1F1F23] hover:text-white'
-                                : 'text-[#71717A] hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
+                                ? 'text-[#F4F0EA] opacity-100 hover:bg-[#1F1F23] hover:text-white'
+                                : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
                             }`}
                           >
                             {isEliminated ? (
@@ -811,6 +797,18 @@ export const QuestionSolver: React.FC = () => {
                       disabled={currentQuestionState.isSubmitted}
                       value={currentQuestionState.draftAnswer}
                       onChange={(e) => handleSprChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === 'Enter' &&
+                          !currentQuestionState.isSubmitted &&
+                          currentQuestionState.draftAnswer.trim()
+                        ) {
+                          e.preventDefault();
+                          handleSubmit();
+                        } else if (e.key === 'Escape') {
+                          e.currentTarget.blur();
+                        }
+                      }}
                       aria-label="Your numeric or fraction answer"
                       className="flex-1 bg-transparent font-mono text-base text-[#F5F5F5] focus:outline-none"
                     />
@@ -858,6 +856,9 @@ export const QuestionSolver: React.FC = () => {
                     className="px-7"
                   >
                     <span>Check Answer</span>
+                    <kbd className="ml-1.5 hidden sm:inline font-mono text-[11px] font-normal text-[#71717A]">
+                      ↵
+                    </kbd>
                   </Button3D>
                 </div>
               )}
@@ -959,6 +960,9 @@ export const QuestionSolver: React.FC = () => {
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Previous</span>
+              <kbd className="hidden md:inline font-mono text-[10px] font-normal text-[#71717A]">
+                K
+              </kbd>
             </Button3D>
 
             {currentIdx < totalQuestions - 1 ? (
@@ -970,6 +974,9 @@ export const QuestionSolver: React.FC = () => {
                 onClick={() => goToQuestionIndex(currentIdx + 1)}
               >
                 <span>Next</span>
+                <kbd className="hidden md:inline font-mono text-[10px] font-normal text-[#71717A]">
+                  J
+                </kbd>
                 <ArrowRight className="h-4 w-4" />
               </Button3D>
             ) : (
