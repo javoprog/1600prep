@@ -14,11 +14,11 @@ const SHORTCUT_ITEMS: Array<{
   description: string;
 }> = [
   {
-    keys: ['A–D', '1–4'],
+    keys: ['A–D', '/', '1–4'],
     description: 'Select answer choice',
   },
   {
-    keys: ['Shift', '+', 'A–D'],
+    keys: ['Shift', '+', 'A–D', '/', '1–4'],
     description: 'Toggle strikethrough on an option',
   },
   {
@@ -26,11 +26,11 @@ const SHORTCUT_ITEMS: Array<{
     description: 'Submit selected answer',
   },
   {
-    keys: ['J', '/', '→'],
+    keys: ['→'],
     description: 'Next question',
   },
   {
-    keys: ['K', '/', '←'],
+    keys: ['←'],
     description: 'Previous question',
   },
   {
@@ -61,7 +61,7 @@ export const ShortcutCheatSheetModal: React.FC<ShortcutCheatSheetModalProps> = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0B]/75 backdrop-blur-sm p-4"
       onClick={() => {
-        soundEngine.play('click');
+        soundEngine.play('toggleClose');
         onClose();
       }}
       role="dialog"
@@ -85,11 +85,11 @@ export const ShortcutCheatSheetModal: React.FC<ShortcutCheatSheetModalProps> = (
           <button
             type="button"
             onClick={() => {
-              soundEngine.play('click');
+              soundEngine.play('toggleClose');
               onClose();
             }}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Close (Esc)"
+            title="Close"
             aria-label="Close keyboard shortcuts"
           >
             <X className="h-4 w-4" />

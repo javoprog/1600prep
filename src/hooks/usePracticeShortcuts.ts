@@ -59,7 +59,7 @@ export function usePracticeShortcuts({
         const closed = onEscape();
         if (closed) {
           e.preventDefault();
-          soundEngine.play('click');
+          soundEngine.play('toggleClose');
         }
         return;
       }
@@ -67,7 +67,6 @@ export function usePracticeShortcuts({
       // '?': toggle keyboard shortcut cheat-sheet modal
       if (e.key === '?') {
         e.preventDefault();
-        soundEngine.play('click');
         onToggleCheatSheet();
         return;
       }
@@ -75,26 +74,25 @@ export function usePracticeShortcuts({
       // 'S' / 's': toggle Scratchpad overlay
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
-        soundEngine.play('click');
         onToggleScratchpad();
         return;
       }
 
-      // 'J' / ArrowRight: next question
-      if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowRight') {
+      // ArrowRight: next question
+      if (e.key === 'ArrowRight') {
         if (canGoNext) {
           e.preventDefault();
-          soundEngine.play('click');
+          soundEngine.play('navigate');
           onNextQuestion();
         }
         return;
       }
 
-      // 'K' / ArrowLeft: previous question
-      if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowLeft') {
+      // ArrowLeft: previous question
+      if (e.key === 'ArrowLeft') {
         if (canGoPrev) {
           e.preventDefault();
-          soundEngine.play('click');
+          soundEngine.play('navigate');
           onPrevQuestion();
         }
         return;
@@ -110,16 +108,25 @@ export function usePracticeShortcuts({
         }
         if (isSubmitted && e.key === 'Enter' && canGoNext) {
           e.preventDefault();
-          soundEngine.play('click');
+          soundEngine.play('navigate');
           onNextQuestion();
           return;
         }
       }
 
-      // MCQ choices: A-D or 1-4 to select, Shift + A-D to toggle strikethrough
+      // MCQ choices: A-D or 1-4 to select, Shift + A-D or Shift + 1-4 to toggle strikethrough
       if (isMcq && !isSubmitted) {
-        const lower = e.key.toLowerCase();
-        const optionMap: Record<string, 'A' | 'B' | 'C' | 'D'> = {
+        const codeMap: Record<string, 'A' | 'B' | 'C' | 'D'> = {
+          KeyA: 'A',
+          KeyB: 'B',
+          KeyC: 'C',
+          KeyD: 'D',
+          Digit1: 'A',
+          Digit2: 'B',
+          Digit3: 'C',
+          Digit4: 'D',
+        };
+        const keyMap: Record<string, 'A' | 'B' | 'C' | 'D'> = {
           a: 'A',
           b: 'B',
           c: 'C',
@@ -128,13 +135,17 @@ export function usePracticeShortcuts({
           '2': 'B',
           '3': 'C',
           '4': 'D',
+          '!': 'A',
+          '@': 'B',
+          '#': 'C',
+          $: 'D',
         };
-        const mapped = optionMap[lower];
+        const mapped = codeMap[e.code] || keyMap[e.key.toLowerCase()];
         if (mapped) {
           e.preventDefault();
-          if (e.shiftKey && ['a', 'b', 'c', 'd'].includes(lower)) {
+          if (e.shiftKey) {
             onToggleEliminateOption(mapped);
-          } else if (!e.shiftKey) {
+          } else {
             onSelectOption(mapped);
           }
         }

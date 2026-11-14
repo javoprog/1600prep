@@ -5,7 +5,7 @@ const ACTIVE_SESSION_KEY = '1600prep_active_session_v1';
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   soundEnabled: true,
-  soundVolume: 0.65,
+  soundVolume: 1.0,
   defaultDifficulties: ['E', 'M', 'H'],
   defaultDifficulty: 'ALL',
   defaultQuestionCount: 10,

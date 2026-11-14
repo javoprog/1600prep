@@ -23,6 +23,9 @@ interface ScratchpadOverlayProps {
   onClose: () => void;
 }
 
+const PEN_WIDTH = 2.25;
+const ERASER_WIDTH = 32; // Diameter in CSS px (radius = 16px)
+
 export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
   isOpen,
   questionId,
@@ -33,6 +36,11 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [activeTool, setActiveTool] = useState<'pen' | 'eraser'>('pen');
+  const [eraserCursor, setEraserCursor] = useState<{
+    x: number;
+    y: number;
+    active: boolean;
+  } | null>(null);
   const activeStrokeRef = useRef<ScratchpadStroke | null>(null);
   const isDrawingRef = useRef<boolean>(false);
 
@@ -45,7 +53,8 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
       const rect = container.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
-      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const dpr =
+        typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
       const targetW = Math.round(width * dpr);
       const targetH = Math.round(height * dpr);
@@ -116,6 +125,13 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
     renderStrokes(strokes, activeStrokeRef.current);
   }, [strokes, isOpen, renderStrokes]);
 
+  // Clear eraser cursor when closing scratchpad or switching to pen
+  useEffect(() => {
+    if (!isOpen || activeTool !== 'eraser') {
+      setEraserCursor(null);
+    }
+  }, [isOpen, activeTool]);
+
   // Keep canvas sized and sharp on container resize or window DPR changes
   useEffect(() => {
     const container = containerRef.current;
@@ -137,13 +153,13 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
 
   const handleUndo = useCallback(() => {
     if (strokes.length === 0) return;
-    soundEngine.play('click');
+    soundEngine.play('undo');
     onChangeStrokes(questionId, strokes.slice(0, -1));
   }, [questionId, strokes, onChangeStrokes]);
 
   const handleClear = useCallback(() => {
     if (strokes.length === 0) return;
-    soundEngine.play('click');
+    soundEngine.play('clear');
     onChangeStrokes(questionId, []);
   }, [questionId, strokes, onChangeStrokes]);
 
@@ -171,11 +187,11 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
         handleClear();
       } else if (key === 'p') {
         e.preventDefault();
-        soundEngine.play('click');
+        soundEngine.play('select');
         setActiveTool('pen');
       } else if (key === 'e') {
         e.preventDefault();
-        soundEngine.play('click');
+        soundEngine.play('select');
         setActiveTool('eraser');
       }
     };
@@ -184,25 +200,35 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleUndo, handleClear]);
 
-  const getNormalizedPoint = (e: React.PointerEvent<HTMLCanvasElement>): ScratchpadPoint => {
+  const getPointerPosition = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { norm: { x: 0, y: 0 }, px: { x: 0, y: 0 } };
     const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
-    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
-    return { x, y };
+    const pxX = e.clientX - rect.left;
+    const pxY = e.clientY - rect.top;
+    const normX = Math.max(0, Math.min(1, pxX / Math.max(1, rect.width)));
+    const normY = Math.max(0, Math.min(1, pxY / Math.max(1, rect.height)));
+    return {
+      norm: { x: normX, y: normY },
+      px: { x: pxX, y: pxY },
+    };
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isOpen || e.button !== 0) return;
     e.preventDefault();
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
 
-    const pt = getNormalizedPoint(e);
+    const { norm, px } = getPointerPosition(e);
+    if (activeTool === 'eraser') {
+      setEraserCursor({ x: px.x, y: px.y, active: true });
+    }
+
     const newStroke: ScratchpadStroke = {
       tool: activeTool,
-      points: [pt],
-      width: activeTool === 'eraser' ? 24 : 2.25,
+      points: [norm],
+      width: activeTool === 'eraser' ? ERASER_WIDTH : PEN_WIDTH,
     };
     isDrawingRef.current = true;
     activeStrokeRef.current = newStroke;
@@ -210,20 +236,37 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isOpen || !isDrawingRef.current || !activeStrokeRef.current) return;
+    if (!isOpen) return;
+    e.stopPropagation();
+
+    const { norm, px } = getPointerPosition(e);
+    if (activeTool === 'eraser') {
+      setEraserCursor({
+        x: px.x,
+        y: px.y,
+        active: isDrawingRef.current,
+      });
+    }
+
+    if (!isDrawingRef.current || !activeStrokeRef.current) return;
     e.preventDefault();
 
-    const pt = getNormalizedPoint(e);
     activeStrokeRef.current = {
       ...activeStrokeRef.current,
-      points: [...activeStrokeRef.current.points, pt],
+      points: [...activeStrokeRef.current.points, norm],
     };
     renderStrokes(strokes, activeStrokeRef.current);
   };
 
   const finishStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activeTool === 'eraser') {
+      const { px } = getPointerPosition(e);
+      setEraserCursor({ x: px.x, y: px.y, active: false });
+    }
+
     if (!isDrawingRef.current || !activeStrokeRef.current) return;
     e.preventDefault();
+    e.stopPropagation();
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
@@ -236,17 +279,23 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
     onChangeStrokes(questionId, [...strokes, finished]);
   };
 
+  const handlePointerLeave = () => {
+    if (!isDrawingRef.current) {
+      setEraserCursor(null);
+    }
+  };
+
   if (!isOpen && strokes.length === 0) {
     return null;
   }
 
   return (
     <>
-      {/* Full-area transparent canvas overlay positioned over the question workspace */}
+      {/* Full-screen workspace canvas overlay (between header and footer) */}
       <div
         ref={containerRef}
-        className={`absolute inset-0 z-20 ${
-          isOpen ? 'pointer-events-auto' : 'pointer-events-none'
+        className={`absolute inset-0 z-[25] overflow-hidden ${
+          isOpen ? 'pointer-events-auto select-none' : 'pointer-events-none'
         }`}
       >
         <canvas
@@ -255,14 +304,33 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={finishStroke}
           onPointerCancel={finishStroke}
+          onPointerLeave={handlePointerLeave}
           className={`h-full w-full touch-none ${
             isOpen
               ? activeTool === 'eraser'
-                ? 'cursor-cell'
+                ? 'cursor-none'
                 : 'cursor-crosshair'
               : 'pointer-events-none'
           }`}
         />
+
+        {/* Visible Eraser Radius Ring Indicator */}
+        {isOpen && activeTool === 'eraser' && eraserCursor && (
+          <div
+            aria-hidden="true"
+            style={{
+              width: `${ERASER_WIDTH}px`,
+              height: `${ERASER_WIDTH}px`,
+              left: `${eraserCursor.x}px`,
+              top: `${eraserCursor.y}px`,
+            }}
+            className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition-colors duration-75 ${
+              eraserCursor.active
+                ? 'border-[#F4F0EA] bg-[#F4F0EA]/20 shadow-[0_0_12px_rgba(244,240,234,0.25)]'
+                : 'border-[#F4F0EA]/80 bg-[#F4F0EA]/10'
+            }`}
+          />
+        )}
       </div>
 
       {/* Minimal Floating Pill Toolbar at Bottom */}
@@ -276,7 +344,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
           <button
             type="button"
             onClick={() => {
-              soundEngine.play('click');
+              soundEngine.play('select');
               setActiveTool('pen');
             }}
             className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer ${
@@ -284,7 +352,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
                 ? 'bg-[#F4F0EA] text-[#0A0A0B] font-semibold'
                 : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
             }`}
-            title="Pen (#F4F0EA)"
+            title="Pen"
           >
             <PenTool className="h-3.5 w-3.5" />
             <span>Pen</span>
@@ -294,7 +362,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
           <button
             type="button"
             onClick={() => {
-              soundEngine.play('click');
+              soundEngine.play('select');
               setActiveTool('eraser');
             }}
             className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer ${
@@ -310,47 +378,44 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
 
           <div className="mx-1 h-4 w-px bg-[#1F1F23]" />
 
-          {/* Undo (Z) */}
+          {/* Undo */}
           <button
             type="button"
             disabled={strokes.length === 0}
             onClick={handleUndo}
             className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
-            title="Undo last stroke (Z)"
+            title="Undo last stroke"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Undo</span>
-            <kbd className="font-mono text-[10px] text-[#71717A]">Z</kbd>
           </button>
 
-          {/* Clear (C) */}
+          {/* Clear */}
           <button
             type="button"
             disabled={strokes.length === 0}
             onClick={handleClear}
             className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
-            title="Clear scratchpad (C)"
+            title="Clear scratchpad"
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Clear</span>
-            <kbd className="font-mono text-[10px] text-[#71717A]">C</kbd>
           </button>
 
           <div className="mx-1 h-4 w-px bg-[#1F1F23]" />
 
-          {/* Close (S / Esc) */}
+          {/* Close */}
           <button
             type="button"
             onClick={() => {
-              soundEngine.play('click');
+              soundEngine.play('toggleClose');
               onClose();
             }}
             className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Close scratchpad (S / Esc)"
+            title="Close scratchpad"
           >
             <X className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Close</span>
-            <kbd className="font-mono text-[10px] text-[#71717A]">Esc</kbd>
           </button>
         </div>
       )}

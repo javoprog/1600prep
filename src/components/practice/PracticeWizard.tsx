@@ -167,7 +167,6 @@ export const PracticeWizard: React.FC = () => {
   );
 
   const toggleDomain = (domainCode: string) => {
-    soundEngine.play('click');
     setStartError(null);
     const domainObj = currentSubjectDomains.find(
       (d) => d.primaryClassCd === domainCode
@@ -181,11 +180,13 @@ export const PracticeWizard: React.FC = () => {
       domainSkillCodes.every((code) => selectedSkills.includes(code));
 
     if (allSkillsInDomainSelected && selectedDomains.includes(domainCode)) {
+      soundEngine.play('deselect');
       setSelectedDomains((prev) => prev.filter((d) => d !== domainCode));
       setSelectedSkills((skPrev) =>
         skPrev.filter((sk) => !domainSkillCodes.includes(sk))
       );
     } else {
+      soundEngine.play('select');
       setSelectedDomains((prev) =>
         prev.includes(domainCode) ? prev : [...prev, domainCode]
       );
@@ -196,7 +197,6 @@ export const PracticeWizard: React.FC = () => {
   };
 
   const toggleSkill = (skillCode: string, domainCode: string) => {
-    soundEngine.play('click');
     setStartError(null);
     const domainObj = currentSubjectDomains.find(
       (d) => d.primaryClassCd === domainCode
@@ -206,6 +206,7 @@ export const PracticeWizard: React.FC = () => {
       : [];
 
     const exists = selectedSkills.includes(skillCode);
+    soundEngine.play(exists ? 'deselect' : 'select');
     const nextSkills = exists
       ? selectedSkills.filter((s) => s !== skillCode)
       : [...selectedSkills, skillCode];
@@ -225,10 +226,10 @@ export const PracticeWizard: React.FC = () => {
   };
 
   const handleToggleDifficulty = (diffCode: DifficultyCode) => {
-    soundEngine.play('select');
     setStartError(null);
     setSelectedDifficulties((prev) => {
       const isSelected = prev.includes(diffCode);
+      soundEngine.play(isSelected ? 'deselect' : 'select');
       if (isSelected) {
         return ORDERED_DIFFICULTIES.filter(
           (d) => d !== diffCode && prev.includes(d)

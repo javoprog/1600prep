@@ -4,6 +4,15 @@ export type SoundEvent =
   | 'hover'
   | 'click'
   | 'select'
+  | 'deselect'
+  | 'strikethrough'
+  | 'restore'
+  | 'navigate'
+  | 'toggleOpen'
+  | 'toggleClose'
+  | 'undo'
+  | 'clear'
+  | 'copy'
   | 'correct'
   | 'incorrect'
   | 'bookmark'
@@ -17,7 +26,10 @@ class SoundEngine {
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       if (!AudioCtx) return null;
       this.ctx = new AudioCtx();
     }
@@ -33,66 +45,162 @@ class SoundEngine {
 
     const nowMs = performance.now();
     if (event === 'hover') {
-      if (nowMs - this.lastHoverTime < 65) return;
+      if (nowMs - this.lastHoverTime < 55) return;
       this.lastHoverTime = nowMs;
-    } else if (event === 'click' || event === 'select') {
-      if (nowMs - this.lastClickTime < 45) return;
+    } else if (
+      event === 'click' ||
+      event === 'select' ||
+      event === 'deselect' ||
+      event === 'navigate'
+    ) {
+      if (nowMs - this.lastClickTime < 35) return;
       this.lastClickTime = nowMs;
     }
 
     const ctx = this.getContext();
     if (!ctx) return;
 
-    const vol = Math.min(1, Math.max(0, settings.soundVolume));
+    // Boost overall volume so UI interactions feel tactile and clearly audible
+    const vol = Math.min(1, Math.max(0.85, settings.soundVolume));
     const now = ctx.currentTime;
 
     try {
       switch (event) {
         case 'hover': {
-          // Very subtle soft tick
+          // Crisp, warm micro-tick
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(920, now);
-          osc.frequency.exponentialRampToValueAtTime(640, now + 0.018);
+          osc.frequency.setValueAtTime(1040, now);
+          osc.frequency.exponentialRampToValueAtTime(680, now + 0.022);
 
-          gain.gain.setValueAtTime(0.025 * vol, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
+          gain.gain.setValueAtTime(0.055 * vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
 
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(now);
-          osc.stop(now + 0.02);
+          osc.stop(now + 0.025);
           break;
         }
 
         case 'click': {
-          // Short crisp click
-          const osc = ctx.createOscillator();
+          // Mechanical tactile button tap (body + crisp transient)
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(520, now);
-          osc.frequency.exponentialRampToValueAtTime(240, now + 0.032);
 
-          gain.gain.setValueAtTime(0.075 * vol, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+          osc1.type = 'triangle';
+          osc1.frequency.setValueAtTime(560, now);
+          osc1.frequency.exponentialRampToValueAtTime(220, now + 0.04);
 
-          osc.connect(gain);
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1120, now);
+          osc2.frequency.exponentialRampToValueAtTime(380, now + 0.025);
+
+          gain.gain.setValueAtTime(0.15 * vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.042);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.035);
+
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.045);
+          osc2.stop(now + 0.03);
           break;
         }
 
         case 'select': {
-          // Soft selection sound
+          // Warm ascending two-step harmonic interval (D5 -> A5)
+          const notes = [587.33, 880];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.028;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.16 * vol, start + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.075);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.08);
+          });
+          break;
+        }
+
+        case 'deselect': {
+          // Smooth descending two-step interval (A5 -> D5)
+          const notes = [783.99, 523.25];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.026;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.13 * vol, start + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.068);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.072);
+          });
+          break;
+        }
+
+        case 'strikethrough': {
+          // Crisp descending cross-out slash tone
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(720, now);
+          osc.frequency.exponentialRampToValueAtTime(260, now + 0.065);
+
+          gain.gain.setValueAtTime(0.16 * vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.068);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.072);
+          break;
+        }
+
+        case 'restore': {
+          // Crisp ascending un-cross / restore tone
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(310, now);
+          osc.frequency.exponentialRampToValueAtTime(760, now + 0.065);
+
+          gain.gain.setValueAtTime(0.15 * vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.068);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.072);
+          break;
+        }
+
+        case 'navigate': {
+          // Smooth page-turn / step transition sound
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(587.33, now + 0.055);
+          osc.frequency.setValueAtTime(340, now);
+          osc.frequency.exponentialRampToValueAtTime(510, now + 0.055);
 
-          gain.gain.setValueAtTime(0.09 * vol, now);
+          gain.gain.setValueAtTime(0.16 * vol, now);
           gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
           osc.connect(gain);
@@ -102,70 +210,159 @@ class SoundEngine {
           break;
         }
 
-        case 'bookmark': {
-          // Short pop (two quick ascending bubbles)
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(480, now);
-          osc.frequency.exponentialRampToValueAtTime(840, now + 0.075);
-
-          gain.gain.setValueAtTime(0.11 * vol, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.085);
-          break;
-        }
-
-        case 'correct': {
-          // Pleasant high-pitched chime (C5 -> E5 -> G5 soft major triad arpeggio)
-          const notes = [523.25, 659.25, 783.99];
+        case 'toggleOpen': {
+          // Bright upward two-note tool/modal open chime
+          const notes = [523.25, 783.99];
           notes.forEach((freq, idx) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            const start = now + idx * 0.065;
+            const start = now + idx * 0.038;
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, start);
 
             gain.gain.setValueAtTime(0.001, start);
-            gain.gain.linearRampToValueAtTime(0.13 * vol, start + 0.015);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+            gain.gain.linearRampToValueAtTime(0.15 * vol, start + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(start);
-            osc.stop(start + 0.3);
+            osc.stop(start + 0.095);
+          });
+          break;
+        }
+
+        case 'toggleClose': {
+          // Soft downward two-note tool/modal close tone
+          const notes = [659.25, 440];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.035;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.14 * vol, start + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.085);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.09);
+          });
+          break;
+        }
+
+        case 'undo': {
+          // Quick reverse pop for Undo
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(620, now);
+          osc.frequency.exponentialRampToValueAtTime(390, now + 0.055);
+
+          gain.gain.setValueAtTime(0.16 * vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.065);
+          break;
+        }
+
+        case 'clear': {
+          // Crisp descending three-step sweep for Clear
+          const notes = [783.99, 587.33, 392.0];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.03;
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.14 * vol, start + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.075);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.08);
+          });
+          break;
+        }
+
+        case 'copy':
+        case 'bookmark': {
+          // Bright double-blip confirmation
+          const notes = [659.25, 987.77];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.045;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.17 * vol, start + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.11);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.12);
+          });
+          break;
+        }
+
+        case 'correct': {
+          // Celebratory major triad chime (C5 -> E5 -> G5 -> C6)
+          const notes = [523.25, 659.25, 783.99, 1046.5];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = now + idx * 0.06;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, start);
+
+            gain.gain.setValueAtTime(0.001, start);
+            gain.gain.linearRampToValueAtTime(0.22 * vol, start + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.34);
           });
           break;
         }
 
         case 'incorrect': {
-          // Soft low-pitched tone (subtle muted descending interval)
-          const notes = [293.66, 246.94];
+          // Distinct low descending double-tone
+          const notes = [311.13, 246.94];
           notes.forEach((freq, idx) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            const start = now + idx * 0.09;
+            const start = now + idx * 0.095;
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, start);
 
             gain.gain.setValueAtTime(0.001, start);
-            gain.gain.linearRampToValueAtTime(0.1 * vol, start + 0.015);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+            gain.gain.linearRampToValueAtTime(0.19 * vol, start + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(start);
-            osc.stop(start + 0.24);
+            osc.stop(start + 0.27);
           });
           break;
         }
 
         case 'complete': {
-          // Short success sound (warm 4-note uplift: C5 -> E5 -> G5 -> C6)
+          // Warm 4-note uplift fanfare
           const notes = [523.25, 659.25, 783.99, 1046.5];
           notes.forEach((freq, idx) => {
             const osc = ctx.createOscillator();
@@ -175,13 +372,13 @@ class SoundEngine {
             osc.frequency.setValueAtTime(freq, start);
 
             gain.gain.setValueAtTime(0.001, start);
-            gain.gain.linearRampToValueAtTime(0.14 * vol, start + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.38);
+            gain.gain.linearRampToValueAtTime(0.24 * vol, start + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.42);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(start);
-            osc.stop(start + 0.4);
+            osc.stop(start + 0.45);
           });
           break;
         }

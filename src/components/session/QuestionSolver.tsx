@@ -201,9 +201,9 @@ export const QuestionSolver: React.FC = () => {
       if (!currentQuestionId || !currentQuestionState || currentQuestionState.isSubmitted) {
         return;
       }
-      soundEngine.play('click');
       const currentElim = eliminatedMap[currentQuestionId] || [];
       const isNowEliminating = !currentElim.includes(label);
+      soundEngine.play(isNowEliminating ? 'strikethrough' : 'restore');
       setEliminatedMap((prev) => {
         const current = prev[currentQuestionId] || [];
         const next = current.includes(label)
@@ -227,6 +227,22 @@ export const QuestionSolver: React.FC = () => {
     },
     []
   );
+
+  const handleToggleScratchpad = useCallback(() => {
+    setIsScratchpadOpen((prev) => {
+      const next = !prev;
+      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+      return next;
+    });
+  }, []);
+
+  const handleToggleCheatSheet = useCallback(() => {
+    setIsCheatSheetOpen((prev) => {
+      const next = !prev;
+      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+      return next;
+    });
+  }, []);
 
   const handleEscapeOverlays = useCallback((): boolean => {
     if (isCheatSheetOpen) {
@@ -270,8 +286,8 @@ export const QuestionSolver: React.FC = () => {
     onSubmitAnswer: handleSubmit,
     onPrevQuestion: () => goToQuestionIndex(currentIdx - 1),
     onNextQuestion: () => goToQuestionIndex(currentIdx + 1),
-    onToggleScratchpad: () => setIsScratchpadOpen((prev) => !prev),
-    onToggleCheatSheet: () => setIsCheatSheetOpen((prev) => !prev),
+    onToggleScratchpad: handleToggleScratchpad,
+    onToggleCheatSheet: handleToggleCheatSheet,
     onEscape: handleEscapeOverlays,
   });
 
@@ -306,7 +322,7 @@ export const QuestionSolver: React.FC = () => {
   };
 
   const handleShareQuestion = async () => {
-    soundEngine.play('click');
+    soundEngine.play('copy');
     if (typeof window === 'undefined') return;
     const shareUrl = `${window.location.origin}/?question=${encodeURIComponent(
       currentQuestionId
@@ -395,8 +411,11 @@ export const QuestionSolver: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    soundEngine.play('click');
-                    setIsCalculatorOpen((prev) => !prev);
+                    setIsCalculatorOpen((prev) => {
+                      const next = !prev;
+                      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                      return next;
+                    });
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                     isCalculatorOpen
@@ -414,8 +433,11 @@ export const QuestionSolver: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    soundEngine.play('click');
-                    setIsReferenceOpen((prev) => !prev);
+                    setIsReferenceOpen((prev) => {
+                      const next = !prev;
+                      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                      return next;
+                    });
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                     isReferenceOpen
@@ -432,42 +454,33 @@ export const QuestionSolver: React.FC = () => {
               </div>
             )}
 
-            {/* Scratchpad Toggle Button (S) */}
+            {/* Scratchpad Toggle Button */}
             <button
               type="button"
-              onClick={() => {
-                soundEngine.play('click');
-                setIsScratchpadOpen((prev) => !prev);
-              }}
+              onClick={handleToggleScratchpad}
               className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
                 isScratchpadOpen
                   ? 'bg-[#18181B] text-[#F4F0EA]'
                   : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
               }`}
-              title="Toggle Scratchpad (S)"
+              title="Toggle Scratchpad"
               aria-label="Toggle Scratchpad"
               aria-pressed={isScratchpadOpen}
             >
               <PenTool className="h-4 w-4" />
               <span className="hidden md:inline">Scratchpad</span>
-              <kbd className="hidden lg:inline font-mono text-[10px] text-[#71717A]">
-                S
-              </kbd>
             </button>
 
             {/* Keyboard Shortcut Cheat-Sheet Button (?) */}
             <button
               type="button"
-              onClick={() => {
-                soundEngine.play('click');
-                setIsCheatSheetOpen((prev) => !prev);
-              }}
+              onClick={handleToggleCheatSheet}
               className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
                 isCheatSheetOpen
                   ? 'bg-[#18181B] text-[#F4F0EA]'
                   : 'text-[#71717A] hover:text-[#F5F5F5]'
               }`}
-              title="Keyboard shortcuts (?)"
+              title="Keyboard shortcuts"
               aria-label="Keyboard shortcuts"
               aria-pressed={isCheatSheetOpen}
             >
@@ -497,26 +510,35 @@ export const QuestionSolver: React.FC = () => {
         <>
           <MathCalculatorPanel
             isOpen={isCalculatorOpen}
-            onClose={() => setIsCalculatorOpen(false)}
+            onClose={() => {
+              soundEngine.play('toggleClose');
+              setIsCalculatorOpen(false);
+            }}
           />
           <MathReferenceSheet
             isOpen={isReferenceOpen}
-            onClose={() => setIsReferenceOpen(false)}
+            onClose={() => {
+              soundEngine.play('toggleClose');
+              setIsReferenceOpen(false);
+            }}
           />
         </>
       )}
       <SprDirectionsWindow
         isOpen={isSprDirectionsOpen}
-        onClose={() => setIsSprDirectionsOpen(false)}
+        onClose={() => {
+          soundEngine.play('toggleClose');
+          setIsSprDirectionsOpen(false);
+        }}
       />
       <ShortcutCheatSheetModal
         isOpen={isCheatSheetOpen}
         onClose={() => setIsCheatSheetOpen(false)}
       />
 
-      {/* Dedicated Examination Workspace */}
-      <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10">
-        {/* Transparent HTML5 Canvas Scratchpad Overlay */}
+      {/* Full-Screen Examination Area (between Header and Footer) */}
+      <main className="relative flex w-full flex-1 flex-col">
+        {/* Transparent Full-Screen HTML5 Canvas Scratchpad Overlay */}
         <ScratchpadOverlay
           isOpen={isScratchpadOpen}
           questionId={currentQuestionId}
@@ -524,6 +546,13 @@ export const QuestionSolver: React.FC = () => {
           onChangeStrokes={handleUpdateScratchpadStrokes}
           onClose={() => setIsScratchpadOpen(false)}
         />
+
+        {/* Dedicated Examination Content Container */}
+        <div
+          className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
+            isScratchpadOpen ? 'pointer-events-none select-none' : ''
+          }`}
+        >
         {isLoadingQuestion ? (
           <div className="flex flex-1 flex-col items-center justify-center py-24">
             <Loader2 className="h-6 w-6 animate-spin text-[#F4F0EA]" />
@@ -828,8 +857,11 @@ export const QuestionSolver: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        soundEngine.play('click');
-                        setIsSprDirectionsOpen((prev) => !prev);
+                        setIsSprDirectionsOpen((prev) => {
+                          const next = !prev;
+                          soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                          return next;
+                        });
                       }}
                       className="text-[#A1A1AA] hover:text-[#F5F5F5] underline underline-offset-4 transition-colors cursor-pointer"
                     >
@@ -856,9 +888,6 @@ export const QuestionSolver: React.FC = () => {
                     className="px-7"
                   >
                     <span>Check Answer</span>
-                    <kbd className="ml-1.5 hidden sm:inline font-mono text-[11px] font-normal text-[#71717A]">
-                      ↵
-                    </kbd>
                   </Button3D>
                 </div>
               )}
@@ -934,7 +963,8 @@ export const QuestionSolver: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </main>
 
       {/* Bottom Examination Navigation Bar */}
       <footer className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md">
@@ -955,14 +985,15 @@ export const QuestionSolver: React.FC = () => {
             <Button3D
               variant="secondary"
               size="md"
+              silentClick
               disabled={currentIdx === 0}
-              onClick={() => goToQuestionIndex(currentIdx - 1)}
+              onClick={() => {
+                soundEngine.play('navigate');
+                goToQuestionIndex(currentIdx - 1);
+              }}
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Previous</span>
-              <kbd className="hidden md:inline font-mono text-[10px] font-normal text-[#71717A]">
-                K
-              </kbd>
             </Button3D>
 
             {currentIdx < totalQuestions - 1 ? (
@@ -971,12 +1002,13 @@ export const QuestionSolver: React.FC = () => {
                   currentQuestionState.isSubmitted ? 'primary' : 'secondary'
                 }
                 size="md"
-                onClick={() => goToQuestionIndex(currentIdx + 1)}
+                silentClick
+                onClick={() => {
+                  soundEngine.play('navigate');
+                  goToQuestionIndex(currentIdx + 1);
+                }}
               >
                 <span>Next</span>
-                <kbd className="hidden md:inline font-mono text-[10px] font-normal text-[#71717A]">
-                  J
-                </kbd>
                 <ArrowRight className="h-4 w-4" />
               </Button3D>
             ) : (
