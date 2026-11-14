@@ -873,13 +873,7 @@ export const QuestionSolver: React.FC = () => {
 
               {/* Primary Check / Submit Action */}
               {!currentQuestionState.isSubmitted && (
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-[#71717A]">
-                    {currentQuestionState.draftAnswer.trim()
-                      ? `Selected response: ${currentQuestionState.draftAnswer}`
-                      : 'Select an answer to check your work'}
-                  </span>
-
+                <div className="flex items-center justify-end pt-2">
                   <Button3D
                     variant="primary"
                     size="lg"

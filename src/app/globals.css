@@ -35,7 +35,9 @@ body {
 }
 
 .font-editorial {
-  font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+  font-family: var(--font-serif), var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
 .font-mono {
@@ -249,35 +251,35 @@ body {
 
 /* Rich SAT Question Content Typography & Media Styling */
 .sat-rich-content {
-  line-height: 1.75;
-  font-size: 1.035rem;
+  line-height: 1.76;
+  font-size: 1.1rem;
   color: #F5F5F5;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
 .sat-rich-passage {
-  font-size: 1.05rem;
+  font-size: 1.125rem;
   line-height: 1.82;
   color: #EAEAEF;
   max-width: 66ch;
 }
 
 .sat-rich-stem {
-  font-size: 1.05rem;
-  line-height: 1.75;
+  font-size: 1.125rem;
+  line-height: 1.76;
   color: #F5F5F5;
 }
 
 .sat-rich-option {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 1.075rem;
+  line-height: 1.62;
   color: #E4E4E7;
 }
 
 .sat-rich-explanation {
-  font-size: 0.975rem;
-  line-height: 1.72;
+  font-size: 1.025rem;
+  line-height: 1.74;
   color: #D4D4D8;
 }
 
@@ -330,11 +332,11 @@ body {
 
 /* Tables inside passages/stems */
 .sat-rich-content figure.table,
-.sat-rich-content table {
+.sat-rich-content table:not(.table_Borderless) {
   width: 100%;
   margin: 1.1rem 0;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.975rem;
   background-color: #111113;
   border: 1px solid #29292E;
   border-radius: 0.5rem;
@@ -349,29 +351,39 @@ body {
   border-bottom: 1px solid #29292E;
 }
 
-.sat-rich-content th,
-.sat-rich-content td {
+.sat-rich-content table:not(.table_Borderless) th,
+.sat-rich-content table:not(.table_Borderless) td {
   padding: 0.65rem 0.95rem;
   border: 1px solid #29292E;
 }
 
-.sat-rich-content thead th {
+.sat-rich-content table:not(.table_Borderless) thead th {
   background-color: #18181B;
   color: #E4E4E7;
   font-weight: 600;
 }
 
-.sat-rich-content tbody tr:nth-child(even) {
+.sat-rich-content table:not(.table_Borderless) tbody tr:nth-child(even) {
   background-color: rgba(255, 255, 255, 0.015);
 }
 
-/* SVGs and Diagrams: inverted dark surface (white -> black, black -> white) & enlarged readable sizing */
-.sat-rich-content figure.image,
-.sat-rich-content svg {
-  max-width: 100%;
-  height: auto;
+/* Borderless layout tables (e.g. systems of equations in disclosed items) */
+.sat-rich-content table.table_Borderless {
+  width: auto;
+  margin: 0.75rem 0;
+  border-collapse: collapse;
+  background: transparent;
+  border: none;
 }
 
+.sat-rich-content table.table_Borderless td,
+.sat-rich-content table.table_Borderless th {
+  padding: 0.25rem 0.35rem;
+  border: none;
+  background: transparent;
+}
+
+/* SVGs and Diagrams: inverted dark surface (white -> black, black -> white) & enlarged readable sizing */
 .sat-rich-content figure.image {
   display: flex;
   flex-direction: column;
@@ -386,26 +398,26 @@ body {
   max-width: 100%;
 }
 
-.sat-rich-content figure.image svg,
-.sat-rich-content p > svg,
-.sat-rich-content div > svg {
+.sat-rich-content svg.sat-diagram-svg,
+.sat-rich-content svg:not(.katex svg) {
   background-color: #FFFFFF;
   color: #000000;
   filter: invert(1);
-  padding: 1rem;
+  padding: 0.85rem;
   margin: 0.9rem auto;
   border-radius: 0.65rem;
   display: block;
-  min-width: min(320px, 100%);
   max-width: 100%;
   height: auto;
 }
 
-.sat-rich-content figure.image svg {
+.sat-rich-content figure.image svg.sat-diagram-svg,
+.sat-rich-content figure.image svg:not(.katex svg) {
   margin: 0;
   padding: 0.5rem;
 }
 
+.sat-rich-content img.sat-diagram-img,
 .sat-rich-content img:not(.math-img) {
   background-color: #FFFFFF;
   filter: invert(1);
@@ -414,7 +426,7 @@ body {
   border: 1px solid #D4D4D8;
   margin: 0.9rem auto;
   display: block;
-  min-width: min(340px, 100%);
+  min-width: min(320px, 100%);
   max-width: min(460px, 100%);
   width: auto;
   height: auto;
@@ -425,19 +437,39 @@ body {
   display: inline-block;
   vertical-align: middle;
   filter: invert(1) brightness(1.15);
-  margin: 0 0.15rem;
-  max-height: 3.5rem;
-  width: auto;
+  margin: 0.1rem 0.18rem;
+  zoom: 1.12;
+  max-width: 100%;
+  height: auto;
 }
 
-/* KaTeX adjustments */
+/* KaTeX adjustments — preserve KaTeX internal SVGs (square roots, tall delimiters, overbars, arrows) */
 .sat-rich-content .katex {
-  font-size: 1.07em;
+  font-size: 1.16em;
 }
+
+.sat-rich-content .katex svg {
+  display: block !important;
+  position: absolute !important;
+  width: 100% !important;
+  height: inherit !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  background: transparent !important;
+  filter: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
 .sat-rich-content .katex-error,
 .katex-error {
   color: inherit !important;
 }
+
 .sat-rich-content .katex-display {
   margin: 0.95rem 0;
   overflow-x: auto;
