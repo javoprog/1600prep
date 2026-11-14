@@ -615,18 +615,14 @@ export const PracticeWizard: React.FC = () => {
                         </span>
                       </div>
 
-                      {selectedSkills.length > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 font-mono text-[11px] text-[#A1A1AA]">
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${d.dotColor}`}
-                          />
-                          <span>{countForDiff}</span>
-                        </span>
-                      ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 font-mono text-[11px] text-[#A1A1AA]">
                         <span
-                          className={`h-2 w-2 rounded-full ${d.dotColor}`}
+                          className={`h-1.5 w-1.5 rounded-full ${d.dotColor}`}
                         />
-                      )}
+                        <span>
+                          {selectedSkills.length > 0 ? countForDiff : '—'}
+                        </span>
+                      </span>
                     </div>
 
                     <p className="mt-2.5 text-[11.5px] leading-snug text-[#71717A]">

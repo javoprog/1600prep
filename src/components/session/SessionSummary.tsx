@@ -49,6 +49,19 @@ export const SessionSummary: React.FC = () => {
     return st?.isSubmitted && !st.isCorrect;
   });
 
+  const displayedQuestionEntries = activeSession.questionIds
+    .map((qId, idx) => ({
+      qId,
+      idx,
+      st: activeSession.questionStates[qId],
+    }))
+    .filter(
+      ({ idx, st }) =>
+        idx <= activeSession.currentIndex ||
+        Boolean(st?.isSubmitted) ||
+        Boolean(st?.draftAnswer)
+    );
+
   const handleReviewAll = () => {
     goToQuestionIndex(0);
     setIsSessionSummaryView(false);
@@ -180,8 +193,7 @@ export const SessionSummary: React.FC = () => {
         </h2>
 
         <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113]">
-          {activeSession.questionIds.map((qId, idx) => {
-            const st = activeSession.questionStates[qId];
+          {displayedQuestionEntries.map(({ qId, idx, st }) => {
             const meta = metaMap.get(qId);
             const diff = getDifficultyBadgeInfo(meta?.difficulty);
 

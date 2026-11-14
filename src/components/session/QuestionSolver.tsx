@@ -162,10 +162,16 @@ export const QuestionSolver: React.FC = () => {
       if (!currentQuestionId || !currentQuestionState || currentQuestionState.isSubmitted) {
         return;
       }
+      const isCurrentlyEliminated = (
+        eliminatedMap[currentQuestionId] || []
+      ).includes(label);
+      if (isCurrentlyEliminated) {
+        return;
+      }
       soundEngine.play('select');
       setDraftAnswer(currentQuestionId, label);
     },
-    [currentQuestionId, currentQuestionState, setDraftAnswer]
+    [currentQuestionId, currentQuestionState, eliminatedMap, setDraftAnswer]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -285,6 +291,8 @@ export const QuestionSolver: React.FC = () => {
           e.preventDefault();
           if (e.shiftKey) {
             soundEngine.play('click');
+            const currentElim = eliminatedMap[currentQuestionId] || [];
+            const isNowEliminating = !currentElim.includes(mapped);
             setEliminatedMap((prev) => {
               const current = prev[currentQuestionId] || [];
               const next = current.includes(mapped)
@@ -292,6 +300,12 @@ export const QuestionSolver: React.FC = () => {
                 : [...current, mapped];
               return { ...prev, [currentQuestionId]: next };
             });
+            if (
+              isNowEliminating &&
+              currentQuestionState.draftAnswer === mapped
+            ) {
+              setDraftAnswer(currentQuestionId, '');
+            }
           } else {
             handleSelectMcq(mapped);
           }
@@ -311,6 +325,8 @@ export const QuestionSolver: React.FC = () => {
     isSprDirectionsOpen,
     isReferenceOpen,
     isCalculatorOpen,
+    eliminatedMap,
+    setDraftAnswer,
     goToQuestionIndex,
     handleSelectMcq,
     handleSubmit,
@@ -333,6 +349,7 @@ export const QuestionSolver: React.FC = () => {
   const toggleEliminateOption = (label: string, e: React.MouseEvent) => {
     e.stopPropagation();
     soundEngine.play('click');
+    const isNowEliminating = !eliminatedForCurrent.includes(label);
     setEliminatedMap((prev) => {
       const current = prev[currentQuestionId] || [];
       const next = current.includes(label)
@@ -340,6 +357,9 @@ export const QuestionSolver: React.FC = () => {
         : [...current, label];
       return { ...prev, [currentQuestionId]: next };
     });
+    if (isNowEliminating && currentQuestionState.draftAnswer === label) {
+      setDraftAnswer(currentQuestionId, '');
+    }
   };
 
   const handleSprChange = (val: string) => {
@@ -684,7 +704,8 @@ export const QuestionSolver: React.FC = () => {
                       <div
                         key={opt.id}
                         role="button"
-                        tabIndex={isSubmitted ? -1 : 0}
+                        tabIndex={isSubmitted || isEliminated ? -1 : 0}
+                        aria-disabled={isSubmitted || isEliminated}
                         onClick={() => handleSelectMcq(opt.label)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -693,7 +714,11 @@ export const QuestionSolver: React.FC = () => {
                           }
                         }}
                         className={`group relative flex items-center gap-4 rounded-xl border p-4 transition-all duration-150 ${optionSurface} ${
-                          isSubmitted ? 'cursor-default' : 'cursor-pointer'
+                          isSubmitted
+                            ? 'cursor-default'
+                            : isEliminated
+                            ? 'cursor-not-allowed'
+                            : 'cursor-pointer'
                         }`}
                       >
                         {/* Full-width visual cross-out line that strikes across text, KaTeX equations, SVGs, and image formulas alike */}
@@ -912,41 +937,55 @@ export const QuestionSolver: React.FC = () => {
 
       {/* Bottom Examination Navigation Bar */}
       <footer className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-end gap-2.5 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2.5 px-4 py-3 sm:px-6">
           <Button3D
             variant="secondary"
             size="md"
-            disabled={currentIdx === 0}
-            onClick={() => goToQuestionIndex(currentIdx - 1)}
+            onClick={
+              isCompletedSession
+                ? () => setIsSessionSummaryView(true)
+                : completeSession
+            }
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Previous</span>
+            <span>Complete Session</span>
           </Button3D>
 
-          {currentIdx < totalQuestions - 1 ? (
+          <div className="flex items-center gap-2.5">
             <Button3D
-              variant={
-                currentQuestionState.isSubmitted ? 'primary' : 'secondary'
-              }
+              variant="secondary"
               size="md"
-              onClick={() => goToQuestionIndex(currentIdx + 1)}
+              disabled={currentIdx === 0}
+              onClick={() => goToQuestionIndex(currentIdx - 1)}
             >
-              <span>Next</span>
-              <ArrowRight className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Previous</span>
             </Button3D>
-          ) : (
-            <Button3D
-              variant="primary"
-              size="md"
-              onClick={
-                isCompletedSession
-                  ? () => setIsSessionSummaryView(true)
-                  : completeSession
-              }
-            >
-              <span>Finish</span>
-            </Button3D>
-          )}
+
+            {currentIdx < totalQuestions - 1 ? (
+              <Button3D
+                variant={
+                  currentQuestionState.isSubmitted ? 'primary' : 'secondary'
+                }
+                size="md"
+                onClick={() => goToQuestionIndex(currentIdx + 1)}
+              >
+                <span>Next</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button3D>
+            ) : (
+              <Button3D
+                variant="primary"
+                size="md"
+                onClick={
+                  isCompletedSession
+                    ? () => setIsSessionSummaryView(true)
+                    : completeSession
+                }
+              >
+                <span>Finish</span>
+              </Button3D>
+            )}
+          </div>
         </div>
       </footer>
     </div>
