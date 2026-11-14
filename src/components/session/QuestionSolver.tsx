@@ -746,7 +746,7 @@ export const QuestionSolver: React.FC = () => {
 
                         <div
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-mono text-xs transition-all ${badgeStyle} ${
-                            isEliminated ? 'opacity-40 line-through' : ''
+                            isEliminated ? 'opacity-40' : ''
                           }`}
                         >
                           {opt.label}
@@ -755,7 +755,7 @@ export const QuestionSolver: React.FC = () => {
                         <div
                           className={`flex-1 transition-opacity ${
                             isEliminated
-                              ? 'opacity-40 line-through grayscale select-none'
+                              ? 'opacity-40 grayscale select-none'
                               : ''
                           }`}
                         >
