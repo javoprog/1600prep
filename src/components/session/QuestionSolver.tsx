@@ -303,6 +303,8 @@ export const QuestionSolver: React.FC = () => {
     currentMeta?.subjectLabel ||
     (activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math');
   const diffBadge = getDifficultyBadgeInfo(currentMeta?.difficulty);
+  const footerBtnClass = 'h-9 whitespace-nowrap sm:h-10 sm:px-4 sm:py-2 sm:text-sm';
+  const footerNavBtnClass = `${footerBtnClass} min-w-[90px] sm:min-w-[108px]`;
 
   const eliminatedForCurrent = eliminatedMap[currentQuestionId] || [];
 
@@ -360,9 +362,9 @@ export const QuestionSolver: React.FC = () => {
     <div className="flex min-h-screen flex-col bg-[#0A0A0B] text-[#F5F5F5]">
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
-        <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
           {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button) */}
-          <div className="flex items-center">
+          <div className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => {
@@ -376,8 +378,8 @@ export const QuestionSolver: React.FC = () => {
             </button>
           </div>
 
-          {/* Center: Question Timer with Minimal Icon-Only Hide/Show Toggle */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+          {/* Center (lg+): Question Timer with Minimal Icon-Only Hide/Show Toggle */}
+          <div className="flex shrink-0 items-center gap-1.5 lg:absolute lg:left-1/2 lg:-translate-x-1/2">
             <span
               className="font-mono text-lg sm:text-xl font-medium tabular-nums tracking-tight text-[#F5F5F5]"
               title="Question elapsed time"
@@ -403,88 +405,90 @@ export const QuestionSolver: React.FC = () => {
             </button>
           </div>
 
-          {/* Right: Math Tools (Calculator & Reference) + Scratchpad + Shortcuts + Share */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {isMathSubject && (
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCalculatorOpen((prev) => {
-                      const next = !prev;
-                      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                      return next;
-                    });
-                  }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
-                    isCalculatorOpen
-                      ? 'bg-[#18181B] text-[#69ff00]'
-                      : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                  }`}
-                  title="Graphing Calculator"
-                  aria-label="Graphing Calculator"
-                  aria-pressed={isCalculatorOpen}
-                >
-                  <Calculator className="h-4 w-4" />
-                  <span className="hidden md:inline">Calculator</span>
-                </button>
+          {/* Right: Desktop/Tablet Tools (Calculator, Reference, Scratchpad, Shortcuts) + Share */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <div className="hidden sm:flex items-center gap-1.5">
+              {isMathSubject && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCalculatorOpen((prev) => {
+                        const next = !prev;
+                        soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                        return next;
+                      });
+                    }}
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                      isCalculatorOpen
+                        ? 'bg-[#18181B] text-[#69ff00]'
+                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                    }`}
+                    title="Graphing Calculator"
+                    aria-label="Graphing Calculator"
+                    aria-pressed={isCalculatorOpen}
+                  >
+                    <Calculator className="h-4 w-4" />
+                    <span className="hidden lg:inline">Calculator</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsReferenceOpen((prev) => {
-                      const next = !prev;
-                      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                      return next;
-                    });
-                  }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
-                    isReferenceOpen
-                      ? 'bg-[#18181B] text-[#69ff00]'
-                      : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                  }`}
-                  title="Math Reference Sheet"
-                  aria-label="Math Reference Sheet"
-                  aria-pressed={isReferenceOpen}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  <span className="hidden md:inline">Reference</span>
-                </button>
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsReferenceOpen((prev) => {
+                        const next = !prev;
+                        soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                        return next;
+                      });
+                    }}
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                      isReferenceOpen
+                        ? 'bg-[#18181B] text-[#69ff00]'
+                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                    }`}
+                    title="Math Reference Sheet"
+                    aria-label="Math Reference Sheet"
+                    aria-pressed={isReferenceOpen}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span className="hidden lg:inline">Reference</span>
+                  </button>
+                </>
+              )}
 
-            {/* Scratchpad Toggle Button */}
-            <button
-              type="button"
-              onClick={handleToggleScratchpad}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
-                isScratchpadOpen
-                  ? 'bg-[#18181B] text-[#69ff00]'
-                  : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-              }`}
-              title="Toggle Scratchpad"
-              aria-label="Toggle Scratchpad"
-              aria-pressed={isScratchpadOpen}
-            >
-              <PenTool className="h-4 w-4" />
-              <span className="hidden md:inline">Scratchpad</span>
-            </button>
+              {/* Scratchpad Toggle Button */}
+              <button
+                type="button"
+                onClick={handleToggleScratchpad}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                  isScratchpadOpen
+                    ? 'bg-[#18181B] text-[#69ff00]'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+                title="Toggle Scratchpad"
+                aria-label="Toggle Scratchpad"
+                aria-pressed={isScratchpadOpen}
+              >
+                <PenTool className="h-4 w-4" />
+                <span className="hidden lg:inline">Scratchpad</span>
+              </button>
 
-            {/* Keyboard Shortcut Cheat-Sheet Button (?) */}
-            <button
-              type="button"
-              onClick={handleToggleCheatSheet}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
-                isCheatSheetOpen
-                  ? 'bg-[#18181B] text-[#69ff00]'
-                  : 'text-[#71717A] hover:text-[#F5F5F5]'
-              }`}
-              title="Keyboard shortcuts"
-              aria-label="Keyboard shortcuts"
-              aria-pressed={isCheatSheetOpen}
-            >
-              ?
-            </button>
+              {/* Keyboard Shortcut Cheat-Sheet Button (?) */}
+              <button
+                type="button"
+                onClick={handleToggleCheatSheet}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
+                  isCheatSheetOpen
+                    ? 'bg-[#18181B] text-[#69ff00]'
+                    : 'text-[#71717A] hover:text-[#F5F5F5]'
+                }`}
+                title="Keyboard shortcuts"
+                aria-label="Keyboard shortcuts"
+                aria-pressed={isCheatSheetOpen}
+              >
+                ?
+              </button>
+            </div>
 
             {/* Icon-only Share Question Link Button without background or text */}
             <button
@@ -606,22 +610,26 @@ export const QuestionSolver: React.FC = () => {
                 useSplitPassageColumn ? 'lg:col-span-6' : ''
               } space-y-8 min-w-0`}
             >
-              {/* Static Single-Line Question Metadata Header (Section, Domain, Truncated Skill, Difficulty & ID) */}
+              {/* Question Metadata Header (Single-line Mobile Skill + ID/Difficulty; Full Breadcrumb on sm+) */}
               <div>
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#1F1F23] pb-3">
-                  <div className="flex items-center gap-2 min-w-0 flex-1 text-xs">
+                <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-[#1F1F23] pb-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
                     <span className="flex h-6 min-w-[1.5rem] shrink-0 px-1.5 items-center justify-center rounded bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
                       {currentIdx + 1}
                     </span>
 
-                    <span className="font-medium text-[#F5F5F5] shrink-0">
+                    <span className="hidden sm:inline font-medium text-[#F5F5F5] shrink-0">
                       {sectionLabel}
                     </span>
 
                     {currentMeta?.domainLabel && (
                       <>
-                        <span className="text-[#3F3F46] shrink-0">•</span>
-                        <span className="text-[#D4D4D8] shrink-0">
+                        <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
+                        <span
+                          className={`${
+                            currentMeta?.skillLabel ? 'hidden sm:inline' : 'truncate min-w-0'
+                          } text-[#D4D4D8] sm:shrink-0`}
+                        >
                           {currentMeta.domainLabel}
                         </span>
                       </>
@@ -629,9 +637,9 @@ export const QuestionSolver: React.FC = () => {
 
                     {currentMeta?.skillLabel && (
                       <>
-                        <span className="text-[#3F3F46] shrink-0">•</span>
+                        <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
                         <span
-                          className="text-[#A1A1AA] truncate min-w-0"
+                          className="min-w-0 truncate text-[#D4D4D8] sm:text-[#A1A1AA]"
                           title={currentMeta.skillLabel}
                         >
                           {currentMeta.skillLabel}
@@ -639,6 +647,14 @@ export const QuestionSolver: React.FC = () => {
                       </>
                     )}
 
+                    {!currentMeta?.skillLabel && !currentMeta?.domainLabel && (
+                      <span className="sm:hidden font-medium text-[#F5F5F5] truncate min-w-0">
+                        {sectionLabel}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
                     {currentMeta?.difficulty && (
                       <span
                         className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${diffBadge.className}`}
@@ -646,11 +662,11 @@ export const QuestionSolver: React.FC = () => {
                         {diffBadge.label}
                       </span>
                     )}
-                  </div>
 
-                  <span className="font-mono text-xs text-[#71717A] shrink-0">
-                    ID {currentQuestionId}
-                  </span>
+                    <span className="font-mono text-xs text-[#71717A] shrink-0">
+                      ID {currentQuestionId}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Math Stimulus (equation, table, system, or figure stored in question.passage) directly above stem */}
@@ -961,10 +977,11 @@ export const QuestionSolver: React.FC = () => {
 
       {/* Bottom Examination Navigation Bar */}
       <footer className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2.5 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-2.5 sm:px-6 sm:py-3">
           <Button3D
             variant="secondary"
-            size="md"
+            size="sm"
+            className={`${footerBtnClass} shrink-0`}
             onClick={
               isCompletedSession
                 ? () => setIsSessionSummaryView(true)
@@ -974,10 +991,11 @@ export const QuestionSolver: React.FC = () => {
             <span>Complete Session</span>
           </Button3D>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
             <Button3D
               variant="secondary"
-              size="md"
+              size="sm"
+              className={footerNavBtnClass}
               silentClick
               disabled={currentIdx === 0}
               onClick={() => {
@@ -985,8 +1003,8 @@ export const QuestionSolver: React.FC = () => {
                 goToQuestionIndex(currentIdx - 1);
               }}
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Previous</span>
+              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Previous</span>
             </Button3D>
 
             {currentIdx < totalQuestions - 1 ? (
@@ -994,7 +1012,8 @@ export const QuestionSolver: React.FC = () => {
                 variant={
                   currentQuestionState.isSubmitted ? 'primary' : 'secondary'
                 }
-                size="md"
+                size="sm"
+                className={footerNavBtnClass}
                 silentClick
                 onClick={() => {
                   soundEngine.play('navigate');
@@ -1002,12 +1021,13 @@ export const QuestionSolver: React.FC = () => {
                 }}
               >
                 <span>Next</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button3D>
             ) : (
               <Button3D
                 variant="primary"
-                size="md"
+                size="sm"
+                className={footerNavBtnClass}
                 onClick={
                   isCompletedSession
                     ? () => setIsSessionSummaryView(true)
