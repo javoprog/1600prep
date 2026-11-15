@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import katex from 'katex';
 import {
-  ExternalLink,
   GripHorizontal,
   X,
 } from 'lucide-react';
@@ -126,27 +125,6 @@ function useDraggableWindow(initialPosition: WindowPosition, approxWidth = 600) 
 }
 
 export type CalculatorLayout = 'floating' | 'left' | 'right';
-
-const PresetLeftIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
-  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
-    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
-    <rect x="3" y="4" width="5" height="8" rx="1" fill="currentColor" />
-  </svg>
-);
-
-const PresetFloatIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
-  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
-    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" opacity="0.55" />
-    <rect x="3.5" y="4.5" width="7" height="5.5" rx="1.2" fill="currentColor" />
-  </svg>
-);
-
-const PresetRightIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
-  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
-    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
-    <rect x="8" y="4" width="5" height="8" rx="1" fill="currentColor" />
-  </svg>
-);
 
 interface ResizeHandlesProps {
   onStartResize: (dir: ResizeDirection, e: React.PointerEvent) => void;
@@ -477,15 +455,6 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
     };
   }, [isInteracting, onChangeLayout, onChangeDockWidth, onResizingDockChange]);
 
-  const selectLayoutPreset = (nextLayout: CalculatorLayout) => {
-    if (nextLayout === layout) return;
-    soundEngine.play('click');
-    if (nextLayout !== 'floating') {
-      lastDockedSideRef.current = nextLayout;
-    }
-    onChangeLayout(nextLayout);
-  };
-
   if (!isOpen && !hasLoadedOnce) {
     return null;
   }
@@ -517,10 +486,10 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
             width: `${Math.max(300, dockWidth - 16)}px`,
             ...(snapPreview === 'left' ? { left: '8px' } : { right: '8px' }),
           }}
-          className="hidden sm:flex fixed z-30 pointer-events-none items-center justify-center rounded-xl border-2 border-[#69ff00]/65 bg-[#69ff00]/[0.08] backdrop-blur-[2px] transition-all duration-150"
+          className="hidden sm:flex fixed z-30 pointer-events-none items-center justify-center rounded-2xl border-2 border-[#69ff00]/65 bg-[#69ff00]/[0.08] backdrop-blur-[2px] transition-all duration-150"
           aria-hidden="true"
         >
-          <div className="rounded-lg border border-[#69ff00]/40 bg-[#111113]/95 px-3 py-1.5 text-xs font-medium text-[#69ff00] shadow-lg">
+          <div className="rounded-full border border-[#69ff00]/40 bg-[#111113]/95 px-3.5 py-1.5 text-xs font-medium text-[#69ff00] shadow-lg">
             {snapPreview === 'left' ? 'Snap Left' : 'Snap Right'}
           </div>
         </div>
@@ -535,7 +504,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
                   ? 'border-r border-[#29292E]'
                   : 'border-l border-[#29292E]'
               } shadow-[0_12px_40px_rgba(0,0,0,0.45)]`
-            : 'z-40 rounded-xl border border-[#3F3F46] shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
+            : 'z-40 rounded-2xl border border-[#3F3F46] shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
         } ${
           isOpen
             ? 'hidden sm:flex opacity-100 pointer-events-auto'
@@ -562,17 +531,21 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
           </div>
         )}
 
-        {/* Draggable Window Title Bar + Preset Layout Switcher */}
+        {/* Draggable Window Title Bar */}
         <div
           onPointerDown={handleHeaderPointerDown}
           onDoubleClick={(e) => {
             if ((e.target as HTMLElement).closest('button, a')) return;
-            selectLayoutPreset(
-              layout === 'floating' ? lastDockedSideRef.current : 'floating'
-            );
+            soundEngine.play('click');
+            if (layout === 'floating') {
+              onChangeLayout(lastDockedSideRef.current);
+            } else {
+              lastDockedSideRef.current = layout;
+              onChangeLayout('floating');
+            }
           }}
-          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3 py-2 cursor-move ${
-            isDocked ? '' : 'rounded-t-xl'
+          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3.5 py-2 cursor-move ${
+            isDocked ? '' : 'rounded-t-2xl'
           }`}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -582,91 +555,24 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Preset Layout Switcher: Left Split / Floating / Right Split */}
-            <div
-              className="flex items-center gap-0.5 rounded-md border border-[#29292E] bg-[#111113] p-0.5"
-              role="group"
-              aria-label="Calculator layout presets"
-            >
-              <button
-                type="button"
-                onClick={() => selectLayoutPreset('left')}
-                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
-                  layout === 'left'
-                    ? 'bg-[#27272A] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-                title="Snap to left side"
-                aria-label="Snap calculator to left side"
-                aria-pressed={layout === 'left'}
-              >
-                <PresetLeftIcon />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => selectLayoutPreset('floating')}
-                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
-                  layout === 'floating'
-                    ? 'bg-[#27272A] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-                title="Floating window"
-                aria-label="Floating calculator window"
-                aria-pressed={layout === 'floating'}
-              >
-                <PresetFloatIcon />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => selectLayoutPreset('right')}
-                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
-                  layout === 'right'
-                    ? 'bg-[#27272A] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-                title="Snap to right side"
-                aria-label="Snap calculator to right side"
-                aria-pressed={layout === 'right'}
-              >
-                <PresetRightIcon />
-              </button>
-            </div>
-
-            <a
-              href="https://www.desmos.com/testing/cb-digital-sat/graphing"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => soundEngine.play('click')}
-              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-              title="Open calculator in new tab"
-              aria-label="Open in tab"
-            >
-              <span className="hidden xl:inline">Open in tab</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.play('click');
-                onClose();
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-              title="Close calculator"
-              aria-label="Close calculator"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('click');
+              onClose();
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            title="Close calculator"
+            aria-label="Close calculator"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Embedded Desmos SAT Graphing Calculator */}
         <div
           className={`relative flex-1 overflow-hidden bg-white ${
-            isDocked ? '' : 'rounded-b-xl'
+            isDocked ? '' : 'rounded-b-2xl'
           }`}
         >
           {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
@@ -711,14 +617,14 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-xl border border-[#3F3F46] bg-[#18181B] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#18181B] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Reference Sheet"
     >
       {/* Draggable Bluebook-Style Window Header */}
       <div
         onPointerDown={startDrag}
-        className="flex items-center justify-between rounded-t-xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
+        className="flex items-center justify-between rounded-t-2xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
       >
         <div className="flex items-center gap-2">
           <GripHorizontal className="h-4 w-4 text-[#71717A]" />
@@ -733,7 +639,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
             soundEngine.play('click');
             onClose();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           title="Close reference sheet"
           aria-label="Close reference sheet"
         >
@@ -743,7 +649,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
       {/* Official Bluebook SAT Reference Sheet Content (Best-Fit Form) */}
       <div
-        className={`overflow-y-auto rounded-b-xl bg-[#F8F8F6] p-5 sm:p-6 text-[#111113] ${
+        className={`overflow-y-auto rounded-b-2xl bg-[#F8F8F6] p-5 sm:p-6 text-[#111113] ${
           isDragging ? 'pointer-events-none' : ''
         }`}
       >
@@ -968,14 +874,14 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-xl border border-[#3F3F46] bg-[#141417] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#141417] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Student-Produced Response Directions"
     >
       {/* Draggable Window Header */}
       <div
         onPointerDown={startDrag}
-        className="flex items-center justify-between rounded-t-xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
+        className="flex items-center justify-between rounded-t-2xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
       >
         <div className="flex items-center gap-2">
           <GripHorizontal className="h-4 w-4 text-[#71717A]" />
@@ -990,7 +896,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
             soundEngine.play('click');
             onClose();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           title="Close directions"
           aria-label="Close directions"
         >
@@ -1000,7 +906,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
 
       {/* Best-Fit Directions Content with Larger Font Size */}
       <div
-        className={`overflow-y-auto rounded-b-xl bg-[#111113] p-6 text-sm text-[#D4D4D8] space-y-5 select-text ${
+        className={`overflow-y-auto rounded-b-2xl bg-[#111113] p-6 text-sm text-[#D4D4D8] space-y-5 select-text ${
           isDragging ? 'pointer-events-none' : ''
         }`}
       >
@@ -1031,7 +937,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
           <div className="mb-2 text-xs font-semibold text-[#A1A1AA]">
             Examples
           </div>
-          <div className="overflow-hidden rounded-lg border border-[#29292E]">
+          <div className="overflow-hidden rounded-2xl border border-[#29292E]">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[#29292E] bg-[#18181B] text-[#E4E4E7]">

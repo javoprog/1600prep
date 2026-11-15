@@ -62,7 +62,7 @@ export const TopNav: React.FC = () => {
                 setTimeout(() => soundEngine.play('click'), 20);
               }
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             {settings.soundEnabled ? (
               <Volume2 className="h-4 w-4 text-[#F5F5F5]" />

@@ -193,7 +193,7 @@ export const SessionSummary: React.FC = () => {
                       </span>
                       {meta?.difficulty && (
                         <span
-                          className={`rounded border px-2 py-0.5 text-xs ${diff.className}`}
+                          className={`rounded-full border px-2.5 py-0.5 text-xs ${diff.className}`}
                         >
                           {diff.label}
                         </span>

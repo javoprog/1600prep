@@ -71,7 +71,7 @@ export const PracticeHome: React.FC = () => {
     >
       {/* Offline Warning Banner */}
       {isOfflineFallback && offlineWarning && (
-        <div className="mb-8 mx-auto max-w-3xl flex items-center justify-between gap-4 rounded-xl border border-[#29292E] bg-[#111113] px-4 py-3 text-xs text-[#F5F5F5]">
+        <div className="mb-8 mx-auto max-w-3xl flex items-center justify-between gap-4 rounded-2xl border border-[#29292E] bg-[#111113] px-4 py-3 text-xs text-[#F5F5F5]">
           <div className="flex items-center gap-2.5">
             <WifiOff className="h-4 w-4 shrink-0 text-white" />
             <span>{offlineWarning}</span>

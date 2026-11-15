@@ -74,7 +74,7 @@ export const SettingsModal: React.FC = () => {
               setConfirmClear(false);
               setIsSettingsOpen(false);
             }}
-            className="rounded-lg p-1.5 text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="rounded-full p-1.5 text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -171,7 +171,7 @@ export const SettingsModal: React.FC = () => {
                         .join(' + ')}
                 </span>
               </div>
-              <div className="inline-flex w-full rounded-xl border border-[#29292E] bg-[#18181B] p-1 gap-1">
+              <div className="inline-flex w-full rounded-full border border-[#29292E] bg-[#18181B] p-1 gap-1">
                 {DIFFICULTY_OPTIONS.map((d) => {
                   const currentList = settings.defaultDifficulties || [
                     'E',
@@ -193,7 +193,7 @@ export const SettingsModal: React.FC = () => {
                           : [...currentList, d.id];
                         updateSettings({ defaultDifficulties: next });
                       }}
-                      className={`flex-1 rounded-lg py-2 px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer ${
+                      className={`flex-1 rounded-full py-2 px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer ${
                         isSelected
                           ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold shadow-sm'
                           : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -211,7 +211,7 @@ export const SettingsModal: React.FC = () => {
               <label className="block text-xs text-[#A1A1AA] mb-2">
                 Default Question Count
               </label>
-              <div className="inline-flex w-full rounded-xl border border-[#29292E] bg-[#18181B] p-1 gap-1">
+              <div className="inline-flex w-full rounded-full border border-[#29292E] bg-[#18181B] p-1 gap-1">
                 {QUESTION_COUNT_PRESETS.map((cnt) => (
                   <button
                     key={cnt}
@@ -220,7 +220,7 @@ export const SettingsModal: React.FC = () => {
                       soundEngine.play('select');
                       updateSettings({ defaultQuestionCount: cnt });
                     }}
-                    className={`flex-1 rounded-lg py-2 text-xs font-medium tabular-nums transition-all duration-150 cursor-pointer ${
+                    className={`flex-1 rounded-full py-2 text-xs font-medium tabular-nums transition-all duration-150 cursor-pointer ${
                       settings.defaultQuestionCount === cnt
                         ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold shadow-sm'
                         : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -262,7 +262,7 @@ export const SettingsModal: React.FC = () => {
             </div>
 
             {confirmClear && (
-              <div className="mt-3 rounded-xl bg-[#201214] border border-[#4C2024] p-3.5">
+              <div className="mt-3 rounded-2xl bg-[#201214] border border-[#4C2024] p-3.5">
                 <div className="flex items-start gap-2.5 text-xs text-red-200">
                   <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                   <div>

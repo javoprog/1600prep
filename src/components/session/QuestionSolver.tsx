@@ -420,7 +420,7 @@ export const QuestionSolver: React.FC = () => {
                 soundEngine.play('click');
                 setIsTimerHidden((prev) => !prev);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[#71717A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[#71717A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isTimerHidden ? 'Show timer' : 'Hide timer'}
               aria-label={isTimerHidden ? 'Show timer' : 'Hide timer'}
             >
@@ -446,7 +446,7 @@ export const QuestionSolver: React.FC = () => {
                         return next;
                       });
                     }}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
                       isCalculatorOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
                         : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -468,7 +468,7 @@ export const QuestionSolver: React.FC = () => {
                         return next;
                       });
                     }}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
                       isReferenceOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
                         : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -487,7 +487,7 @@ export const QuestionSolver: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleScratchpad}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs transition-colors cursor-pointer ${
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
                   isScratchpadOpen
                     ? 'bg-[#18181B] text-[#69ff00]'
                     : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -505,7 +505,7 @@ export const QuestionSolver: React.FC = () => {
             <button
               type="button"
               onClick={handleShareQuestion}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isShareCopied ? 'Link copied!' : 'Copy link to this question'}
               aria-label="Copy link to this question"
             >
@@ -644,7 +644,7 @@ export const QuestionSolver: React.FC = () => {
               <div>
                 <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-[#1F1F23] pb-3">
                   <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
-                    <span className="flex h-6 min-w-[1.5rem] shrink-0 px-1.5 items-center justify-center rounded bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
+                    <span className="flex h-6 min-w-[1.5rem] shrink-0 px-2 items-center justify-center rounded-full bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
                       {currentIdx + 1}
                     </span>
 
@@ -687,7 +687,7 @@ export const QuestionSolver: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
                     {currentMeta?.difficulty && (
                       <span
-                        className={`shrink-0 rounded border px-2 py-0.5 text-xs ${diffBadge.className}`}
+                        className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${diffBadge.className}`}
                       >
                         {diffBadge.label}
                       </span>
@@ -773,7 +773,7 @@ export const QuestionSolver: React.FC = () => {
                             handleSelectMcq(opt.label);
                           }
                         }}
-                        className={`group relative flex items-center gap-4 rounded-xl border p-4 transition-all duration-150 ${optionSurface} ${
+                        className={`group relative flex items-center gap-4 rounded-2xl border p-4 transition-all duration-150 ${optionSurface} ${
                           isSubmitted
                             ? 'cursor-default'
                             : isEliminated
@@ -790,7 +790,7 @@ export const QuestionSolver: React.FC = () => {
                         )}
 
                         <div
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-mono text-xs transition-all ${badgeStyle} ${
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-xs transition-all ${badgeStyle} ${
                             isEliminated ? 'opacity-40' : ''
                           }`}
                         >
@@ -832,7 +832,7 @@ export const QuestionSolver: React.FC = () => {
                                 ? `Restore answer choice ${opt.label}`
                                 : `Cross out answer choice ${opt.label}`
                             }
-                            className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all cursor-pointer ${
+                            className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all cursor-pointer ${
                               isEliminated
                                 ? 'text-white opacity-100 hover:bg-[#1F1F23] hover:text-white'
                                 : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
@@ -853,7 +853,7 @@ export const QuestionSolver: React.FC = () => {
                 /* Design-Consistent Student-Produced Response (SPR) Input */
                 <div className="space-y-2.5">
                   <div
-                    className={`flex items-center gap-4 rounded-xl border p-4 transition-all duration-150 ${
+                    className={`flex items-center gap-4 rounded-2xl border p-4 transition-all duration-150 ${
                       currentQuestionState.isSubmitted
                         ? currentQuestionState.isCorrect
                           ? 'border-emerald-500/50 bg-[#101F18] text-[#F5F5F5]'
@@ -951,7 +951,7 @@ export const QuestionSolver: React.FC = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                             currentQuestionState.isCorrect
                               ? 'bg-emerald-500/15 text-emerald-400'
                               : 'bg-red-500/15 text-red-400'
@@ -983,14 +983,14 @@ export const QuestionSolver: React.FC = () => {
                         </div>
                       </div>
 
-                      <span className="shrink-0 rounded-md border border-[#29292E] bg-[#0A0A0B] px-2.5 py-1 text-xs font-medium tabular-nums text-[#A1A1AA]">
+                      <span className="shrink-0 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3 py-1 text-xs font-medium tabular-nums text-[#A1A1AA]">
                         {formatShortDuration(currentQuestionState.timeSpent)}
                       </span>
                     </div>
 
                     {/* Your Answer vs Correct Answer Comparison Strip */}
                     <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-[#29292E] bg-[#0A0A0B] px-3 py-1.5 text-xs">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3.5 py-1.5 text-xs">
                         <span className="text-[#A1A1AA]">Your answer</span>
                         <span
                           className={`font-mono font-semibold ${
@@ -1003,7 +1003,7 @@ export const QuestionSolver: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-1.5 text-xs">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-3.5 py-1.5 text-xs">
                         <span className="text-[#A1A1AA]">Correct answer</span>
                         <span className="font-mono font-semibold text-emerald-300">
                           {question.correctAnswer.length > 0
@@ -1051,7 +1051,7 @@ export const QuestionSolver: React.FC = () => {
         ref={footerRef}
         className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-2.5 sm:px-6 sm:py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
           <Button3D
             variant="secondary"
             size="sm"

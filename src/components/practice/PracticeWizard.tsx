@@ -506,7 +506,7 @@ export const PracticeWizard: React.FC = () => {
                   >
                     <div className="flex items-start gap-3.5">
                       <div
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
                           isAllDomSkillsSelected
                             ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                             : isSomeDomSkillsSelected
@@ -539,7 +539,7 @@ export const PracticeWizard: React.FC = () => {
                           onClick={() =>
                             toggleSkill(sk.code, dom.primaryClassCd)
                           }
-                          className={`flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left text-xs transition-colors cursor-pointer ${
+                          className={`flex items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-xs transition-colors cursor-pointer ${
                             isSkSelected
                               ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5]'
                               : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
@@ -585,7 +585,7 @@ export const PracticeWizard: React.FC = () => {
                     role="checkbox"
                     aria-checked={isSelected}
                     onClick={() => handleToggleDifficulty(d.id)}
-                    className={`group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150 cursor-pointer ${
+                    className={`group relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-150 cursor-pointer ${
                       isSelected
                         ? 'border-[#69ff00]/75 bg-[#18181B]'
                         : 'border-[#29292E] bg-[#0A0A0B] hover:border-[#3F3F46] hover:bg-[#141417]'
@@ -595,7 +595,7 @@ export const PracticeWizard: React.FC = () => {
                       <div className="flex items-center gap-2.5">
                         {/* Refined Custom Checkbox */}
                         <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all duration-150 ${
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-150 ${
                             isSelected
                               ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
                               : 'border-[#3F3F46] bg-[#111113] group-hover:border-[#52525B]'
@@ -617,7 +617,7 @@ export const PracticeWizard: React.FC = () => {
                         </span>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 text-xs tabular-nums text-[#A1A1AA]">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-xs tabular-nums text-[#A1A1AA]">
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${d.dotColor}`}
                         />
@@ -638,7 +638,7 @@ export const PracticeWizard: React.FC = () => {
 
           {/* Inline Warning when skills + difficulties selected but 0 matching questions */}
           {hasValidSelection && maxAvailableQuestions === 0 && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
+            <div className="flex items-start gap-2.5 rounded-2xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
               <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
               <div>
                 No questions match this exact combination of skills and
@@ -649,7 +649,7 @@ export const PracticeWizard: React.FC = () => {
           )}
 
           {startError && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
+            <div className="flex items-start gap-2.5 rounded-2xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
               <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
               <span>{startError}</span>
             </div>
