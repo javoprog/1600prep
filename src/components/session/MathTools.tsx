@@ -755,7 +755,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
           </li>
           <li>
             If your answer is a <strong className="text-[#F5F5F5]">mixed number</strong> (such as{' '}
-            <KatexFormula tex="3\frac{1}{2}" className="text-[#F5F5F5]" />), enter it as an improper fraction (<code className="font-mono text-[#F4F0EA]">7/2</code>) or its decimal equivalent (<code className="font-mono text-[#F4F0EA]">3.5</code>).
+            <KatexFormula tex="3\frac{1}{2}" className="text-[#F5F5F5]" />), enter it as an improper fraction (<code className="font-mono text-white">7/2</code>) or its decimal equivalent (<code className="font-mono text-white">3.5</code>).
           </li>
           <li>
             Don&apos;t enter <strong className="text-[#F5F5F5]">symbols</strong> such as a percent sign (<code className="font-mono text-[#A1A1AA]">%</code>), comma (<code className="font-mono text-[#A1A1AA]">,</code>), or dollar sign (<code className="font-mono text-[#A1A1AA]">$</code>).
@@ -764,7 +764,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
 
         {/* Official Bluebook Examples Table */}
         <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#A1A1AA]">
+          <div className="mb-2 text-xs font-semibold text-[#A1A1AA]">
             Examples
           </div>
           <div className="overflow-hidden rounded-lg border border-[#29292E]">

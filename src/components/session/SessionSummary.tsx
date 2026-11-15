@@ -99,20 +99,20 @@ export const SessionSummary: React.FC = () => {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 animate-completion">
       {/* Editorial Header */}
       <div className="border-b border-[#1F1F23] pb-8">
-        <p className="text-xs font-medium text-[#D6CEBF]">
+        <p className="text-xs font-medium text-white">
           Session completed •{' '}
           {activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'}
         </p>
         <div className="mt-2 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
           <div>
-            <h1 className="font-editorial text-4xl sm:text-5xl text-[#F5F5F5] tracking-tight">
+            <h1 className="font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
               {activeSession.title}
             </h1>
             <p className="mt-2 text-sm text-[#A1A1AA]">{encouragingLine}</p>
           </div>
 
           <div className="sm:text-right">
-            <div className="font-editorial text-5xl text-[#69ff00]">
+            <div className="font-editorial text-3xl sm:text-4xl tabular-nums text-[#69ff00]">
               {accuracy}%
             </div>
             <div className="text-xs text-[#71717A] mt-0.5">Session Accuracy</div>
@@ -123,30 +123,30 @@ export const SessionSummary: React.FC = () => {
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-[#1F1F23] pt-6">
           <div>
             <div className="text-xs text-[#71717A]">Answered</div>
-            <div className="mt-1 font-mono text-lg font-medium text-[#F5F5F5]">
+            <div className="mt-1 text-lg font-medium tabular-nums text-[#F5F5F5]">
               {answeredCount}
             </div>
           </div>
 
           <div>
             <div className="text-xs text-[#71717A]">Correct</div>
-            <div className="mt-1 font-mono text-lg font-medium text-emerald-400">
+            <div className="mt-1 text-lg font-medium tabular-nums text-emerald-400">
               {correctCount}
             </div>
           </div>
 
           <div>
             <div className="text-xs text-[#71717A]">Incorrect</div>
-            <div className="mt-1 font-mono text-lg font-medium text-red-400">
+            <div className="mt-1 text-lg font-medium tabular-nums text-red-400">
               {incorrectCount}
             </div>
           </div>
 
           <div>
             <div className="text-xs text-[#71717A]">Time (Avg)</div>
-            <div className="mt-1 font-mono text-lg font-medium text-[#F5F5F5]">
+            <div className="mt-1 text-lg font-medium tabular-nums text-[#F5F5F5]">
               {formatDuration(totalTimeMs)}{' '}
-              <span className="text-xs text-[#71717A]">
+              <span className="text-xs font-normal text-[#71717A]">
                 ({formatShortDuration(avgTimeMs)}/q)
               </span>
             </div>
@@ -219,7 +219,7 @@ export const SessionSummary: React.FC = () => {
                       </span>
                       {meta?.difficulty && (
                         <span
-                          className={`rounded border px-1.5 py-0.5 text-[10px] ${diff.className}`}
+                          className={`rounded border px-2 py-0.5 text-xs ${diff.className}`}
                         >
                           {diff.label}
                         </span>
@@ -244,7 +244,7 @@ export const SessionSummary: React.FC = () => {
                     ) : (
                       <span className="text-[#71717A]">Unanswered</span>
                     )}
-                    <div className="font-mono text-[11px] text-[#71717A]">
+                    <div className="text-xs tabular-nums text-[#71717A]">
                       {formatShortDuration(st?.timeSpent || 0)}
                     </div>
                   </div>

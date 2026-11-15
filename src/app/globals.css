@@ -11,8 +11,6 @@
   --text-muted: #71717A;
   --border-default: #29292E;
   --border-subtle: #1F1F23;
-  --accent-ivory: #F4F0EA;
-  --accent-champagne: #D6CEBF;
   --brand-primary: #69ff00;
   --brand-primary-hover: #7dff24;
 }
@@ -253,35 +251,35 @@ body {
 
 /* Rich SAT Question Content Typography & Media Styling */
 .sat-rich-content {
-  line-height: 1.76;
-  font-size: 1.1rem;
+  line-height: 1.72;
+  font-size: 1rem;
   color: #F5F5F5;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
 .sat-rich-passage {
-  font-size: 1.125rem;
-  line-height: 1.82;
+  font-size: 1rem;
+  line-height: 1.78;
   color: #EAEAEF;
   max-width: 66ch;
 }
 
 .sat-rich-stem {
-  font-size: 1.125rem;
-  line-height: 1.76;
+  font-size: 1rem;
+  line-height: 1.72;
   color: #F5F5F5;
 }
 
 .sat-rich-option {
-  font-size: 1.075rem;
+  font-size: 0.9375rem;
   line-height: 1.62;
   color: #E4E4E7;
 }
 
 .sat-rich-explanation {
-  font-size: 1.025rem;
-  line-height: 1.74;
+  font-size: 0.9375rem;
+  line-height: 1.72;
   color: #D4D4D8;
 }
 
@@ -307,7 +305,7 @@ body {
 }
 
 .sat-rich-content blockquote {
-  border-left: 2px solid #D6CEBF;
+  border-left: 2px solid #FFFFFF;
   padding-left: 1.1rem;
   margin: 0.95rem 0;
   color: #D4D4D8;
@@ -434,20 +432,19 @@ body {
   height: auto;
 }
 
-/* Inline math PNGs in legacy disclosed (IBN) questions */
+/* Inline math PNGs in legacy disclosed (IBN) fallback cases */
 .sat-rich-content img.math-img {
   display: inline-block;
   vertical-align: middle;
   filter: invert(1) brightness(1.15);
-  margin: 0.1rem 0.18rem;
-  zoom: 1.12;
+  margin: 0.08rem 0.16rem;
   max-width: 100%;
   height: auto;
 }
 
-/* KaTeX adjustments — preserve KaTeX internal SVGs (square roots, tall delimiters, overbars, arrows) */
+/* KaTeX adjustments — match surrounding typography cleanly while preserving internal SVGs */
 .sat-rich-content .katex {
-  font-size: 1.16em;
+  font-size: 1.06em;
 }
 
 .sat-rich-content .katex svg {

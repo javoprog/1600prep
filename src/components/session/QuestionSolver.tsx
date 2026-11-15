@@ -35,7 +35,6 @@ import {
   ScratchpadOverlay,
   ScratchpadStroke,
 } from '@/components/session/ScratchpadOverlay';
-import { ShortcutCheatSheetModal } from '@/components/session/ShortcutCheatSheetModal';
 import { usePracticeShortcuts } from '@/hooks/usePracticeShortcuts';
 import {
   formatDuration,
@@ -63,7 +62,6 @@ export const QuestionSolver: React.FC = () => {
   const [eliminatedMap, setEliminatedMap] = useState<Record<string, string[]>>({});
   const [scratchpadMap, setScratchpadMap] = useState<Record<string, ScratchpadStroke[]>>({});
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
-  const [isCheatSheetOpen, setIsCheatSheetOpen] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
@@ -237,19 +235,7 @@ export const QuestionSolver: React.FC = () => {
     });
   }, []);
 
-  const handleToggleCheatSheet = useCallback(() => {
-    setIsCheatSheetOpen((prev) => {
-      const next = !prev;
-      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-      return next;
-    });
-  }, []);
-
   const handleEscapeOverlays = useCallback((): boolean => {
-    if (isCheatSheetOpen) {
-      setIsCheatSheetOpen(false);
-      return true;
-    }
     if (isScratchpadOpen) {
       setIsScratchpadOpen(false);
       return true;
@@ -268,7 +254,6 @@ export const QuestionSolver: React.FC = () => {
     }
     return false;
   }, [
-    isCheatSheetOpen,
     isScratchpadOpen,
     isSprDirectionsOpen,
     isReferenceOpen,
@@ -288,7 +273,6 @@ export const QuestionSolver: React.FC = () => {
     onPrevQuestion: () => goToQuestionIndex(currentIdx - 1),
     onNextQuestion: () => goToQuestionIndex(currentIdx + 1),
     onToggleScratchpad: handleToggleScratchpad,
-    onToggleCheatSheet: handleToggleCheatSheet,
     onEscape: handleEscapeOverlays,
   });
 
@@ -405,7 +389,7 @@ export const QuestionSolver: React.FC = () => {
             </button>
           </div>
 
-          {/* Right: Desktop/Tablet Tools (Calculator, Reference, Scratchpad, Shortcuts) + Share */}
+          {/* Right: Desktop/Tablet Tools (Calculator, Reference, Scratchpad) + Share */}
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
             <div className="hidden sm:flex items-center gap-1.5">
               {isMathSubject && (
@@ -472,22 +456,6 @@ export const QuestionSolver: React.FC = () => {
                 <PenTool className="h-4 w-4" />
                 <span className="hidden lg:inline">Scratchpad</span>
               </button>
-
-              {/* Keyboard Shortcut Cheat-Sheet Button (?) */}
-              <button
-                type="button"
-                onClick={handleToggleCheatSheet}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg font-mono text-xs transition-colors cursor-pointer ${
-                  isCheatSheetOpen
-                    ? 'bg-[#18181B] text-[#69ff00]'
-                    : 'text-[#71717A] hover:text-[#F5F5F5]'
-                }`}
-                title="Keyboard shortcuts"
-                aria-label="Keyboard shortcuts"
-                aria-pressed={isCheatSheetOpen}
-              >
-                ?
-              </button>
             </div>
 
             {/* Icon-only Share Question Link Button without background or text */}
@@ -508,7 +476,7 @@ export const QuestionSolver: React.FC = () => {
         </div>
       </header>
 
-      {/* Floating SAT Math Calculator, Reference Sheet, SPR Directions & Shortcut Cheat-Sheet Windows */}
+      {/* Floating SAT Math Calculator, Reference Sheet & SPR Directions Windows */}
       {isMathSubject && (
         <>
           <MathCalculatorPanel
@@ -533,10 +501,6 @@ export const QuestionSolver: React.FC = () => {
           soundEngine.play('toggleClose');
           setIsSprDirectionsOpen(false);
         }}
-      />
-      <ShortcutCheatSheetModal
-        isOpen={isCheatSheetOpen}
-        onClose={() => setIsCheatSheetOpen(false)}
       />
 
       {/* Full-Screen Examination Area (between Header and Footer) */}
@@ -657,7 +621,7 @@ export const QuestionSolver: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
                     {currentMeta?.difficulty && (
                       <span
-                        className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${diffBadge.className}`}
+                        className={`shrink-0 rounded border px-2 py-0.5 text-xs ${diffBadge.className}`}
                       >
                         {diffBadge.label}
                       </span>
@@ -804,7 +768,7 @@ export const QuestionSolver: React.FC = () => {
                             }
                             className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all cursor-pointer ${
                               isEliminated
-                                ? 'text-[#F4F0EA] opacity-100 hover:bg-[#1F1F23] hover:text-white'
+                                ? 'text-white opacity-100 hover:bg-[#1F1F23] hover:text-white'
                                 : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
                             }`}
                           >
@@ -904,64 +868,105 @@ export const QuestionSolver: React.FC = () => {
               {/* Instant Feedback & Explanation Area */}
               {currentQuestionState.isSubmitted && (
                 <div
-                  className={`rounded-2xl border p-6 ${
+                  className={`overflow-hidden rounded-2xl border bg-[#111113] ${
                     currentQuestionState.isCorrect
-                      ? 'animate-feedback-correct border-emerald-500/35 bg-[#0F1B15]'
-                      : 'animate-feedback-incorrect border-red-500/35 bg-[#1D1113]'
+                      ? 'animate-feedback-correct border-emerald-500/30'
+                      : 'animate-feedback-incorrect border-red-500/30'
                   }`}
                 >
-                  {/* Feedback Header with Friendly Microcopy */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-                    <div className="flex items-center gap-3">
-                      {currentQuestionState.isCorrect ? (
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-400 shrink-0" />
-                      )}
-                      <div>
+                  {/* Structured Status Header Band */}
+                  <div
+                    className={`border-b border-[#1F1F23] px-5 py-4 sm:px-6 ${
+                      currentQuestionState.isCorrect
+                        ? 'bg-emerald-500/[0.06]'
+                        : 'bg-red-500/[0.06]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
                         <div
-                          className={`text-sm font-semibold ${
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                            currentQuestionState.isCorrect
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : 'bg-red-500/15 text-red-400'
+                          }`}
+                        >
+                          {currentQuestionState.isCorrect ? (
+                            <CheckCircle2 className="h-4.5 w-4.5" />
+                          ) : (
+                            <XCircle className="h-4.5 w-4.5" />
+                          )}
+                        </div>
+                        <div>
+                          <div
+                            className={`text-sm font-semibold ${
+                              currentQuestionState.isCorrect
+                                ? 'text-emerald-300'
+                                : 'text-red-300'
+                            }`}
+                          >
+                            {currentQuestionState.isCorrect
+                              ? 'Correct'
+                              : 'Incorrect'}
+                          </div>
+                          <div className="text-xs text-[#A1A1AA]">
+                            {currentQuestionState.isCorrect
+                              ? 'Well done — review the walkthrough below if needed.'
+                              : 'Review the solution steps below to see why.'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="shrink-0 rounded-md border border-[#29292E] bg-[#0A0A0B] px-2.5 py-1 text-xs font-medium tabular-nums text-[#A1A1AA]">
+                        {formatShortDuration(currentQuestionState.timeSpent)}
+                      </span>
+                    </div>
+
+                    {/* Your Answer vs Correct Answer Comparison Strip */}
+                    <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-[#29292E] bg-[#0A0A0B] px-3 py-1.5 text-xs">
+                        <span className="text-[#A1A1AA]">Your answer</span>
+                        <span
+                          className={`font-mono font-semibold ${
                             currentQuestionState.isCorrect
                               ? 'text-emerald-300'
                               : 'text-red-300'
                           }`}
                         >
-                          {currentQuestionState.isCorrect
-                            ? 'Nice work — that is correct.'
-                            : 'Not quite — review the explanation below.'}
-                        </div>
-                        <div className="text-xs text-[#A1A1AA] mt-0.5">
-                          Your answer:{' '}
-                          <span className="font-mono text-[#F5F5F5]">
-                            {currentQuestionState.submittedAnswer}
-                          </span>{' '}
-                          • Correct answer:{' '}
-                          <span className="font-mono text-emerald-300">
-                            {question.correctAnswer.length > 0
-                              ? question.correctAnswer.join(' or ')
-                              : 'See explanation'}
-                          </span>
-                        </div>
+                          {currentQuestionState.submittedAnswer}
+                        </span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-1.5 text-xs">
+                        <span className="text-[#A1A1AA]">Correct answer</span>
+                        <span className="font-mono font-semibold text-emerald-300">
+                          {question.correctAnswer.length > 0
+                            ? question.correctAnswer.join(' or ')
+                            : 'See explanation'}
+                        </span>
                       </div>
                     </div>
-
-                    <span className="font-mono text-xs text-[#A1A1AA]">
-                      {formatShortDuration(currentQuestionState.timeSpent)}
-                    </span>
                   </div>
 
                   {/* Explanation Body */}
-                  <div className="mt-5">
-                    <div className="mb-2.5 text-xs font-medium text-[#D6CEBF]">
-                      Explanation
+                  <div className="p-5 sm:p-6">
+                    <div className="mb-3.5 flex items-center gap-2.5">
+                      <span
+                        className="h-4 w-1 rounded-full bg-[#69ff00]"
+                        aria-hidden="true"
+                      />
+                      <h3 className="text-sm font-semibold text-white">
+                        Explanation
+                      </h3>
                     </div>
+
                     {question.explanation ? (
                       <RichMathContent
                         html={question.explanation}
                         variant="explanation"
                       />
                     ) : (
-                      <p className="text-xs text-[#A1A1AA] italic">
+                      <p className="text-sm text-[#A1A1AA]">
                         An official explanation is not provided for this item in the
                         College Board Question Bank.
                       </p>

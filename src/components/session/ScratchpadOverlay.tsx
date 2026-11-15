@@ -86,8 +86,8 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
           ctx.fillStyle = 'rgba(0,0,0,1)';
         } else {
           ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = '#F4F0EA';
-          ctx.fillStyle = '#F4F0EA';
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.fillStyle = '#FFFFFF';
         }
 
         const pts = stroke.points.map((p) => ({
@@ -326,8 +326,8 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
             }}
             className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition-colors duration-75 ${
               eraserCursor.active
-                ? 'border-[#F4F0EA] bg-[#F4F0EA]/20 shadow-[0_0_12px_rgba(244,240,234,0.25)]'
-                : 'border-[#F4F0EA]/80 bg-[#F4F0EA]/10'
+                ? 'border-white bg-white/20 shadow-[0_0_12px_rgba(255,255,255,0.25)]'
+                : 'border-white/80 bg-white/10'
             }`}
           />
         )}

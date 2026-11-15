@@ -62,9 +62,9 @@ export const PracticeHome: React.FC = () => {
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       {/* Offline Warning Banner */}
       {isOfflineFallback && offlineWarning && (
-        <div className="mb-8 mx-auto max-w-3xl flex items-center justify-between gap-4 rounded-xl border border-[#3F3A28] bg-[#171510] px-4 py-3 text-xs text-[#E4DBC8]">
+        <div className="mb-8 mx-auto max-w-3xl flex items-center justify-between gap-4 rounded-xl border border-[#29292E] bg-[#111113] px-4 py-3 text-xs text-[#F5F5F5]">
           <div className="flex items-center gap-2.5">
-            <WifiOff className="h-4 w-4 shrink-0 text-[#D6CEBF]" />
+            <WifiOff className="h-4 w-4 shrink-0 text-white" />
             <span>{offlineWarning}</span>
           </div>
           <Button3D variant="secondary" size="sm" onClick={reloadCatalog}>

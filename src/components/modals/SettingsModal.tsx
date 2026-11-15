@@ -128,7 +128,7 @@ export const SettingsModal: React.FC = () => {
             <div>
               <div className="flex items-center justify-between text-xs text-[#A1A1AA] mb-1.5">
                 <span>Volume</span>
-                <span className="font-mono text-[#F5F5F5]">
+                <span className="tabular-nums font-medium text-[#F5F5F5]">
                   {Math.round(settings.soundVolume * 100)}%
                 </span>
               </div>
@@ -220,7 +220,7 @@ export const SettingsModal: React.FC = () => {
                       soundEngine.play('select');
                       updateSettings({ defaultQuestionCount: cnt });
                     }}
-                    className={`flex-1 rounded-lg py-2 font-mono text-xs font-medium transition-all duration-150 cursor-pointer ${
+                    className={`flex-1 rounded-lg py-2 text-xs font-medium tabular-nums transition-all duration-150 cursor-pointer ${
                       settings.defaultQuestionCount === cnt
                         ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold shadow-sm'
                         : 'text-[#A1A1AA] hover:text-[#F5F5F5]'

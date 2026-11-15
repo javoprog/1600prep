@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { spokenMathToLatex } from '@/utils/spokenMathToLatex';
 
 const OPERATOR_MAP: Record<string, string> = {
   '−': '-',
@@ -472,11 +473,14 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
     return rawHtml;
   }
 
+  // Strip Word clipboard comments that fragment inline math text nodes
   // Expand any self-closing MathML tags before HTML5 DOMParser runs
-  let preProcessed = rawHtml.replace(
-    /<(mspace|none|mprescripts|mi|mn|mo|mtext|ms)\b([^>]*?)\/>/gi,
-    '<$1$2></$1>'
-  );
+  let preProcessed = rawHtml
+    .replace(/<!--\s*(?:Start|End)Fragment\s*-->/gi, '')
+    .replace(
+      /<(mspace|none|mprescripts|mi|mn|mo|mtext|ms)\b([^>]*?)\/>/gi,
+      '<$1$2></$1>'
+    );
 
   // Convert explicit LaTeX \[...\] and \(...\) if present
   if (preProcessed.includes('\\(') || preProcessed.includes('\\[')) {
@@ -533,7 +537,135 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
       mathEl.replaceWith(...Array.from(wrapper.childNodes));
     }
 
-    // 2. Normalize standalone diagram <svg> elements (excluding KaTeX internal SVGs)
+    // 2. Unwrap malformed <sup> wrappers around full math containers (e.g. item 025616-DC)
+    for (const supEl of Array.from(doc.querySelectorAll('sup'))) {
+      if (supEl.closest('.katex')) continue;
+      const nonEmptyChildren = Array.from(supEl.childNodes).filter(
+        (n) => n.nodeType !== Node.TEXT_NODE || (n.textContent || '').trim() !== ''
+      );
+      if (
+        nonEmptyChildren.length === 1 &&
+        nonEmptyChildren[0].nodeType === Node.ELEMENT_NODE
+      ) {
+        const onlyEl = nonEmptyChildren[0] as Element;
+        if (
+          onlyEl.classList.contains('math-container') ||
+          onlyEl.tagName.toLowerCase() === 'img'
+        ) {
+          supEl.replaceWith(...Array.from(supEl.childNodes));
+        }
+      }
+    }
+
+    // 3. Replace empty Greek symbol spans like <span class="theta"></span>
+    const emptyGreekMap: Record<string, string> = {
+      theta: '\\theta ',
+      pi: '\\pi ',
+      alpha: '\\alpha ',
+      beta: '\\beta ',
+      gamma: '\\gamma ',
+      delta: '\\Delta ',
+      lambda: '\\lambda ',
+      mu: '\\mu ',
+      sigma: '\\sigma ',
+      omega: '\\omega ',
+    };
+    for (const spanEl of Array.from(doc.querySelectorAll('span[class]'))) {
+      if (spanEl.closest('.katex') || spanEl.childNodes.length > 0) continue;
+      for (const cls of Array.from(spanEl.classList)) {
+        const tex = emptyGreekMap[cls.toLowerCase()];
+        if (tex) {
+          const frag = createMathFrag(doc, tex, spanEl.outerHTML, false);
+          spanEl.replaceWith(frag);
+          break;
+        }
+      }
+    }
+
+    // 4. Classify <img> elements: convert spoken inline math PNGs to vector KaTeX (keeping PNG fallback only if unparseable)
+    const imgNodes = Array.from(doc.querySelectorAll('img'));
+    for (const imgEl of imgNodes) {
+      const isInlineMath =
+        imgEl.classList.contains('math-img') ||
+        imgEl.getAttribute('role') === 'math' ||
+        imgEl.getAttribute('align') === 'middle' ||
+        Boolean(imgEl.closest('.math-container, .math'));
+
+      if (!isInlineMath) {
+        imgEl.classList.add('sat-diagram-img');
+        imgEl.removeAttribute('width');
+        imgEl.removeAttribute('height');
+        continue;
+      }
+
+      const latex = spokenMathToLatex(imgEl.getAttribute('alt'));
+      if (latex && isValidKatex(latex)) {
+        const isMultiline = latex.includes('\\begin{');
+        const frag = createMathFrag(doc, latex, imgEl.outerHTML, isMultiline);
+        const container = imgEl.closest('span.math-container');
+        if (
+          container &&
+          Array.from(container.childNodes).every(
+            (n) => n === imgEl || (n.nodeType === Node.TEXT_NODE && !(n.textContent || '').trim())
+          )
+        ) {
+          container.replaceWith(frag);
+        } else {
+          imgEl.replaceWith(frag);
+        }
+      } else {
+        imgEl.classList.add('math-img');
+      }
+    }
+
+    // Unwrap redundant .math_expression spans when they wrap a single inline math fragment
+    for (const exprSpan of Array.from(doc.querySelectorAll('span.math_expression, span.math-container'))) {
+      if (exprSpan.closest('.katex')) continue;
+      const nonEmpty = Array.from(exprSpan.childNodes).filter(
+        (n) => n.nodeType !== Node.TEXT_NODE || (n.textContent || '').trim() !== ''
+      );
+      if (
+        nonEmpty.length === 1 &&
+        nonEmpty[0].nodeType === Node.ELEMENT_NODE &&
+        (nonEmpty[0] as Element).hasAttribute('data-sat-tex')
+      ) {
+        exprSpan.replaceWith(nonEmpty[0]);
+      }
+    }
+
+    // 5. Convert HTML italic math variables (<span class="italic">, <em class="inline_variable">, math <em>/<i>)
+    promoteHtmlMathElements(doc);
+
+    // 6. Merge contiguous inline math fragments & <sup>/<sub> & operators into unified KaTeX expressions
+    mergeContiguousMathInDoc(doc);
+
+    // 7. Compile all unified .sat-math-frag spans via KaTeX
+    for (const frag of Array.from(doc.querySelectorAll('span[data-sat-tex]'))) {
+      const tex = (frag.getAttribute('data-sat-tex') || '').trim();
+      const fallbackHtml = frag.getAttribute('data-sat-fallback') || '';
+      if (!tex) {
+        frag.remove();
+        continue;
+      }
+      try {
+        const rendered = katex.renderToString(tex, {
+          throwOnError: true,
+          displayMode: false,
+          strict: false,
+          trust: true,
+          errorColor: 'inherit',
+        });
+        const holder = doc.createElement('span');
+        holder.innerHTML = rendered;
+        frag.replaceWith(...Array.from(holder.childNodes));
+      } catch {
+        const holder = doc.createElement('span');
+        holder.innerHTML = fallbackHtml;
+        frag.replaceWith(...Array.from(holder.childNodes));
+      }
+    }
+
+    // 8. Normalize standalone diagram <svg> elements (excluding KaTeX internal SVGs)
     const svgNodes = Array.from(doc.querySelectorAll('svg'));
     for (const svgEl of svgNodes) {
       if (svgEl.closest('.katex')) continue;
@@ -573,26 +705,507 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
       }
     }
 
-    // 3. Classify <img> elements into inline math PNGs vs standalone diagram figures
-    const imgNodes = Array.from(doc.querySelectorAll('img'));
-    for (const imgEl of imgNodes) {
-      const isInlineMath =
-        imgEl.classList.contains('math-img') ||
-        imgEl.getAttribute('role') === 'math' ||
-        imgEl.getAttribute('align') === 'middle' ||
-        Boolean(imgEl.closest('.math-container, .math'));
-
-      if (isInlineMath) {
-        imgEl.classList.add('math-img');
-      } else {
-        imgEl.classList.add('sat-diagram-img');
-        imgEl.removeAttribute('width');
-        imgEl.removeAttribute('height');
-      }
-    }
-
     return doc.body.innerHTML;
   } catch {
     return preProcessed;
+  }
+}
+
+function isValidKatex(tex: string): boolean {
+  try {
+    katex.renderToString(tex, { throwOnError: true, strict: false, trust: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createMathFrag(
+  doc: Document,
+  tex: string,
+  fallbackHtml: string,
+  locked: boolean
+): HTMLSpanElement {
+  const span = doc.createElement('span');
+  span.setAttribute('data-sat-tex', tex);
+  span.setAttribute('data-sat-fallback', fallbackHtml);
+  if (locked) span.setAttribute('data-sat-locked', '1');
+  return span;
+}
+
+function toKatexSnippet(rawText: string): string {
+  return rawText
+    .replace(/\u00A0/g, ' ')
+    .replace(/[−–]/g, '-')
+    .replace(/×/g, ' \\times ')
+    .replace(/÷/g, ' \\div ')
+    .replace(/[·⋅]/g, ' \\cdot ')
+    .replace(/≤/g, ' \\le ')
+    .replace(/≥/g, ' \\ge ')
+    .replace(/≠/g, ' \\ne ')
+    .replace(/≈/g, ' \\approx ')
+    .replace(/±/g, ' \\pm ')
+    .replace(/π/g, '\\pi ')
+    .replace(/θ/g, '\\theta ')
+    .replace(/°/g, '^{\\circ}')
+    .replace(/\$/g, '\\$')
+    .replace(/%/g, '\\%')
+    .replace(/(\d),(\d{3})(?!\d)/g, '$1{,}$2');
+}
+
+function extractInlineElementTex(el: Element): string | null {
+  let out = '';
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      out += toKatexSnippet(child.textContent || '');
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const ce = child as Element;
+      const tag = ce.tagName.toLowerCase();
+      if (ce.hasAttribute('data-sat-tex')) {
+        out += ce.getAttribute('data-sat-tex') || '';
+      } else if (tag === 'sup' || tag === 'sub') {
+        const inner = extractInlineElementTex(ce);
+        if (inner == null) return null;
+        const trimmed = inner.trim();
+        if (!trimmed || /^(?:st|nd|rd|th)$/i.test(trimmed)) return null;
+        out += tag === 'sup' ? `^{${trimmed}}` : `_{${trimmed}}`;
+      } else if (tag === 'span' && ce.childNodes.length === 0) {
+        continue;
+      } else {
+        return null;
+      }
+    }
+  }
+  return out;
+}
+
+function isMathItalicElement(el: Element): boolean {
+  const tag = el.tagName.toLowerCase();
+  if (el.closest('.katex, pre, code')) return false;
+  if (tag === 'span') return el.classList.contains('italic');
+  if (tag !== 'em' && tag !== 'i') return false;
+  if (el.classList.contains('inline_variable')) return true;
+
+  const rawText = (el.textContent || '').replace(/\u00A0/g, ' ').trim();
+  if (!rawText || /^[.,;:!?'"\-–—()\[\]]+$/.test(rawText)) return false;
+
+  if (el.querySelector('sup, sub')) return true;
+  if (/[=<>+\-×÷·⋅°≤≥≠≈]/.test(rawText)) return true;
+
+  // All-caps geometric points like "QOR", "ABC"
+  if (/^[A-Z]{2,5}$/.test(rawText)) return true;
+
+  // Single lowercase math variable (skip standalone "a" unless adjacent to math delimiter)
+  if (/^[b-hj-z]$/.test(rawText)) return true;
+  if (rawText === 'a' || rawText === 'i' || /^[A-Z]$/.test(rawText)) {
+    const prevCh = (el.previousSibling?.textContent || '').slice(-1);
+    const nextCh = (el.nextSibling?.textContent || '').charAt(0);
+    if (
+      /[0-9=<>+\-×÷(,]/.test(prevCh) ||
+      /[0-9=<>+\-×÷),]/.test(nextCh) ||
+      nextCh === '^' ||
+      nextCh === '_'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function promoteHtmlMathElements(doc: Document): void {
+  const candidates = Array.from(
+    doc.querySelectorAll('span.italic, em, i')
+  ).filter((el) => {
+    // Skip elements nested inside an outer candidate or sup/sub (outer handles children)
+    const p = el.parentElement;
+    return !p?.closest('span.italic, em, i, sup, sub');
+  });
+
+  for (const el of candidates) {
+    if (!isMathItalicElement(el)) continue;
+
+    const rawExtracted = extractInlineElementTex(el);
+    if (rawExtracted == null) continue;
+
+    let work = rawExtracted.replace(/\s+/g, ' ');
+    let leadText = '';
+    let trailText = '';
+
+    // Handle rare editorial typo "<span class='italic'>x. S</span>ubtracting"
+    const typoMatch = work.match(/^([A-Za-z0-9\\{}^_()\s]+?)(\.\s+[A-Z])$/);
+    if (typoMatch) {
+      work = typoMatch[1];
+      trailText = typoMatch[2];
+    }
+
+    // Separate leading space so KaTeX wraps cleanly around punctuation
+    const leadMatch = work.match(/^(\s+)(.*)$/);
+    if (leadMatch) {
+      leadText = leadMatch[1];
+      work = leadMatch[2];
+    }
+
+    // Peel trailing punctuation unless already extracted (preserve "=" or math ops on the right)
+    if (!trailText) {
+      const punctMatch = work.match(/^(.*?)(\s*[.,;?!]+\s*|\s*-\s*)$/);
+      if (punctMatch && punctMatch[1].trim()) {
+        work = punctMatch[1];
+        trailText = punctMatch[2];
+      } else {
+        const spaceEnd = work.match(/^(.*?)(\s+)$/);
+        if (spaceEnd && !/[=<>+\-]$/.test(spaceEnd[1])) {
+          work = spaceEnd[1];
+          trailText = spaceEnd[2];
+        }
+      }
+    }
+
+    const finalTex = work.trim();
+    if (!finalTex || /^[.,;:!?]+$/.test(finalTex) || finalTex.length > 48) {
+      continue;
+    }
+    // Never turn ordinary English phrases inside italic spans into math
+    const wordTokens = finalTex.match(/[A-Za-z]{3,}/g) || [];
+    const safeWords = new Set(['times', 'cdot', 'circ', 'approx', 'sin', 'cos', 'tan', 'log', 'ABC', 'DEF', 'ACE', 'BCD', 'ABCD', 'PQR', 'QOR']);
+    if (wordTokens.some((w) => !safeWords.has(w) && /^[a-z]+$/.test(w))) {
+      continue;
+    }
+
+    if (!isValidKatex(finalTex)) continue;
+
+    const replacementNodes: Node[] = [];
+    if (leadText) replacementNodes.push(doc.createTextNode(leadText));
+    replacementNodes.push(createMathFrag(doc, finalTex, el.outerHTML, false));
+    if (trailText) replacementNodes.push(doc.createTextNode(trailText));
+
+    el.replaceWith(...replacementNodes);
+  }
+}
+
+function isOrdinalSupText(text: string): boolean {
+  return /^(?:st|nd|rd|th|[®™©*†‡§])$/i.test(text.trim());
+}
+
+function getSupSubInnerTex(el: Element): { tex: string; fallback: string } | null {
+  if (el.querySelector('img, svg, table, div, p')) return null;
+  const raw = extractInlineElementTex(el);
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 28 || isOrdinalSupText(trimmed)) return null;
+  return { tex: trimmed, fallback: el.outerHTML };
+}
+
+function peelTrailingMathPrefix(text: string): { rest: string; mathPrefix: string } {
+  // Capture trailing math expression before a fragment or <sup> (e.g. "2.5 × 10", "50,000(1.03)", "(2 + ", "(")
+  const norm = text.replace(/\u00A0/g, ' ');
+  const m = norm.match(
+    /^(.*?(?:^|[\s:;(\[{=+\-–−×÷·⋅<>≤≥,]))((?:[-–−+]?\s*)?(?:[(\[]+\s*)*(?:[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?\s*°?)(?:\s*(?:[+\-–−=<>≤≥≠≈±×÷·⋅/]|\([^)]*\))\s*(?:[(\[]*\s*[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?\s*°?|\([^)]*\))?)*\s*)$/
+  );
+  if (!m) {
+    // Also check a trailing open bracket/paren or unary minus like "(", "-(" right before a math frag
+    const parenM = norm.match(/^(.*?)([-–−+\s]*[(\[]+\s*)$/);
+    if (parenM) {
+      const rawParen = parenM[2];
+      // Do not consume standalone space before paren if there's an operator vs English word; leave space in rest
+      const trimmedLead = rawParen.match(/^(\s*)(.*)$/);
+      if (trimmedLead) {
+        return {
+          rest: text.slice(0, parenM[1].length) + trimmedLead[1],
+          mathPrefix: toKatexSnippet(trimmedLead[2]),
+        };
+      }
+    }
+    return { rest: text, mathPrefix: '' };
+  }
+
+  let prefix = m[1];
+  let captured = m[2];
+  // Avoid separating a number from a preceding unit/word comma unless punctuation/space was captured
+  // Leave leading whitespace inside prose prefix so "If 2x" -> "If " + KaTeX("2x")
+  const wsLead = captured.match(/^(\s*)(.*)$/);
+  if (wsLead) {
+    prefix += wsLead[1];
+    captured = wsLead[2];
+  }
+
+  // Do not pull standalone reference numbers after prose labels like "equation 1", "day 3"
+  if (
+    /^\d+$/.test(captured.trim()) &&
+    /\b(?:equation|inequality|statement|choice|option|step|table|figure|line|day|month|year|part|question|item)\s+$/i.test(
+      prefix
+    )
+  ) {
+    return { rest: text, mathPrefix: '' };
+  }
+
+  // Don't strip trailing sentence comma right before prose word if captured is just spaces
+  if (!captured.trim()) {
+    return { rest: text, mathPrefix: '' };
+  }
+
+  // Reconstruct slice offset accurately on original string length
+  const usedLen = text.length - prefix.length;
+  const origPrefix = text.slice(0, prefix.length);
+  const origCaptured = text.slice(prefix.length, prefix.length + usedLen);
+  return { rest: origPrefix, mathPrefix: toKatexSnippet(origCaptured) };
+}
+
+function joinLatexTokens(left: string, right: string): string {
+  if (!left) return right;
+  if (!right) return left;
+  if (/(?:^|[^\\])\\[A-Za-z]+$/.test(left) && /^[A-Za-z]/.test(right)) {
+    return `${left} ${right}`;
+  }
+  return `${left}${right}`;
+}
+
+function peelLeadingMathSuffix(
+  text: string,
+  hasOpenParen: boolean
+): { mathSuffix: string; rest: string } {
+  const norm = text.replace(/\u00A0/g, ' ');
+  // Do NOT swallow hyphenated English suffixes like "-intercept", "-axis", "-value"
+  if (/^\s*[-–−]\s*[A-Za-z]{2,}/.test(norm)) {
+    return { mathSuffix: '', rest: text };
+  }
+
+  // Pull leading math tokens: spaces + operators/numbers/parens/°/% ending cleanly before prose or sentence end
+  let idx = 0;
+  let depth = hasOpenParen ? 1 : 0;
+  let lastValidEnd = 0;
+
+  while (idx < norm.length) {
+    const sub = norm.slice(idx);
+    // Stop before hyphenated word like "-intercept"
+    if (/^\s*[-–−][A-Za-z]{2,}/.test(sub)) break;
+
+    const tok = sub.match(
+      /^(?:\s+|(?:\d+(?:,\d{3})*(?:\.\d+)?)|[+\-–−=<>≤≥≠≈±×÷·⋅/()\[\]°%])/
+    );
+    if (!tok) break;
+    const val = tok[0];
+    if (val === '(' || val === '[') depth++;
+    else if (val === ')' || val === ']') {
+      if (depth === 0) break;
+      depth--;
+    }
+    idx += val.length;
+    if (!/^\s+$/.test(val)) {
+      lastValidEnd = idx;
+    }
+  }
+
+  if (lastValidEnd === 0) {
+    return { mathSuffix: '', rest: text };
+  }
+
+  const rawTaken = text.slice(0, lastValidEnd);
+  const rest = text.slice(lastValidEnd);
+  return { mathSuffix: toKatexSnippet(rawTaken), rest };
+}
+
+function isPureMathConnector(
+  text: string,
+  hasNextFrag: boolean,
+  openParens: number
+): boolean {
+  const norm = text.replace(/\u00A0/g, ' ').trim();
+  if (!norm) return true;
+  if (/^[-–−]\s*[A-Za-z]{2,}/.test(norm)) return false;
+  if (norm === ',' && hasNextFrag && openParens > 0) return true;
+  // Numbers/operators/parens/degree signs between two math fragments (e.g. " + 2", " = ", " + ", ") + ")
+  return /^[\s0-9.,+\-–−=<>≤≥≠≈±×÷·⋅/()\[\]°%]+$/.test(norm) && !/[.,;:?!]$/.test(norm);
+}
+
+function countParenBalance(tex: string): number {
+  let bal = 0;
+  for (const ch of tex) {
+    if (ch === '(' || ch === '[') bal++;
+    else if (ch === ')' || ch === ']') bal = Math.max(0, bal - 1);
+  }
+  return bal;
+}
+
+function wrapMathBaseForScript(tex: string): string {
+  const t = tex.trim();
+  if (/^[A-Za-z0-9\\]+$/.test(t) || (t.startsWith('(') && t.endsWith(')'))) {
+    return t;
+  }
+  return t;
+}
+
+function mergeContiguousMathInDoc(doc: Document): void {
+  const containers = Array.from(doc.querySelectorAll('p, li, td, th, div, label, span'));
+  // Process innermost containers first
+  containers.reverse();
+
+  for (const container of containers) {
+    if (
+      container.closest('.katex, .sat-diagram-svg') ||
+      container.hasAttribute('data-sat-tex')
+    ) {
+      continue;
+    }
+    const children = Array.from(container.childNodes);
+    const hasRelevant = children.some(
+      (n) =>
+        n.nodeType === Node.ELEMENT_NODE &&
+        ((n as Element).hasAttribute('data-sat-tex') ||
+          ['sup', 'sub'].includes((n as Element).tagName.toLowerCase()))
+    );
+    if (!hasRelevant) continue;
+
+    type Item =
+      | { kind: 'text'; text: string }
+      | { kind: 'frag'; tex: string; fallback: string; locked: boolean }
+      | { kind: 'sup' | 'sub'; tex: string; fallback: string }
+      | { kind: 'other'; node: ChildNode };
+
+    const items: Item[] = [];
+    for (const node of children) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = node.textContent || '';
+        const prev = items[items.length - 1];
+        if (prev && prev.kind === 'text') prev.text += txt;
+        else items.push({ kind: 'text', text: txt });
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        if (el.hasAttribute('data-sat-tex')) {
+          items.push({
+            kind: 'frag',
+            tex: el.getAttribute('data-sat-tex') || '',
+            fallback: el.getAttribute('data-sat-fallback') || '',
+            locked: el.getAttribute('data-sat-locked') === '1',
+          });
+        } else {
+          const tag = el.tagName.toLowerCase();
+          if (tag === 'sup' || tag === 'sub') {
+            const parsed = getSupSubInnerTex(el);
+            if (parsed) {
+              items.push({ kind: tag, tex: parsed.tex, fallback: parsed.fallback });
+            } else {
+              items.push({ kind: 'other', node });
+            }
+          } else {
+            items.push({ kind: 'other', node });
+          }
+        }
+      } else {
+        items.push({ kind: 'other', node });
+      }
+    }
+
+    const outNodes: Node[] = [];
+    let i = 0;
+
+    const absorbMathRun = (initialTex: string, initialFallback: string) => {
+      let runTex = initialTex;
+      let fallback = initialFallback;
+
+      while (i < items.length) {
+        const nxt = items[i];
+        if (nxt.kind === 'sup' || nxt.kind === 'sub') {
+          runTex = `${wrapMathBaseForScript(runTex)}${nxt.kind === 'sup' ? `^{${nxt.tex}}` : `_{${nxt.tex}}`}`;
+          fallback += nxt.fallback;
+          i++;
+        } else if (nxt.kind === 'frag' && !nxt.locked) {
+          runTex = joinLatexTokens(runTex, nxt.tex);
+          fallback += nxt.fallback;
+          i++;
+        } else if (nxt.kind === 'text') {
+          const afterItem = items[i + 1];
+          const canBridge =
+            afterItem &&
+            ((afterItem.kind === 'frag' && !afterItem.locked) ||
+              afterItem.kind === 'sup' ||
+              afterItem.kind === 'sub') &&
+            isPureMathConnector(nxt.text, afterItem.kind === 'frag', countParenBalance(runTex));
+          if (canBridge) {
+            runTex = joinLatexTokens(runTex, toKatexSnippet(nxt.text));
+            fallback += nxt.text;
+            i++;
+          } else {
+            const { mathSuffix, rest: rem } = peelLeadingMathSuffix(
+              nxt.text,
+              countParenBalance(runTex) > 0
+            );
+            if (mathSuffix) {
+              runTex = joinLatexTokens(runTex, mathSuffix);
+              fallback += nxt.text.slice(0, nxt.text.length - rem.length);
+              if (rem) items[i] = { kind: 'text', text: rem };
+              else i++;
+            }
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+
+      outNodes.push(createMathFrag(doc, runTex.trim(), fallback, false));
+    };
+
+    const pullPrefixFromPrevText = (): { tex: string; fallback: string } | null => {
+      if (
+        outNodes.length === 0 ||
+        outNodes[outNodes.length - 1].nodeType !== Node.TEXT_NODE
+      ) {
+        return null;
+      }
+      const prevTextNode = outNodes[outNodes.length - 1] as Text;
+      const { rest, mathPrefix } = peelTrailingMathPrefix(prevTextNode.textContent || '');
+      if (!mathPrefix.trim()) return null;
+      prevTextNode.textContent = rest;
+      if (!rest) outNodes.pop();
+      return { tex: mathPrefix, fallback: mathPrefix };
+    };
+
+    while (i < items.length) {
+      const cur = items[i];
+
+      if (cur.kind === 'sup' || cur.kind === 'sub') {
+        const pulled = pullPrefixFromPrevText();
+        if (pulled) {
+          const initTex = `${wrapMathBaseForScript(pulled.tex)}${cur.kind === 'sup' ? `^{${cur.tex}}` : `_{${cur.tex}}`}`;
+          const initFallback = `${pulled.fallback}${cur.fallback}`;
+          i++;
+          absorbMathRun(initTex, initFallback);
+          continue;
+        }
+        const holder = doc.createElement('span');
+        holder.innerHTML = cur.fallback;
+        outNodes.push(...Array.from(holder.childNodes));
+        i++;
+        continue;
+      }
+
+      if (cur.kind === 'text') {
+        if (cur.text) outNodes.push(doc.createTextNode(cur.text));
+        i++;
+        continue;
+      }
+
+      if (cur.kind === 'other') {
+        outNodes.push(cur.node);
+        i++;
+        continue;
+      }
+
+      if (cur.kind === 'frag') {
+        if (cur.locked) {
+          outNodes.push(createMathFrag(doc, cur.tex, cur.fallback, true));
+          i++;
+          continue;
+        }
+
+        const pulled = pullPrefixFromPrevText();
+        const initTex = pulled ? joinLatexTokens(pulled.tex, cur.tex) : cur.tex;
+        const initFallback = pulled ? `${pulled.fallback}${cur.fallback}` : cur.fallback;
+        i++;
+        absorbMathRun(initTex, initFallback);
+      }
+    }
+
+    container.replaceChildren(...outNodes);
   }
 }

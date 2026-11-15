@@ -42,10 +42,10 @@ const DIFFICULTY_OPTIONS: Array<{
     id: 'M',
     label: 'Medium',
     description: 'Standard Digital SAT exam complexity',
-    dotColor: 'bg-amber-300',
-    activeBorder: 'border-amber-400/50',
-    activeBg: 'bg-amber-950/20',
-    badgeColors: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+    dotColor: 'bg-white',
+    activeBorder: 'border-white/40',
+    activeBg: 'bg-white/[0.06]',
+    badgeColors: 'border-white/25 bg-white/10 text-white',
   },
   {
     id: 'H',
@@ -326,9 +326,9 @@ export const PracticeWizard: React.FC = () => {
                   }`}
                 >
                   <span
-                    className={`flex h-5 w-5 items-center justify-center rounded-full font-mono text-[11px] transition-colors ${
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-colors ${
                       isCurrent
-                        ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                        ? 'bg-[#69ff00] text-[#0A0A0B]'
                         : isPast
                         ? 'bg-[#202024] text-[#F5F5F5]'
                         : 'bg-[#141417] text-[#52525B]'
@@ -344,7 +344,7 @@ export const PracticeWizard: React.FC = () => {
           })}
         </div>
 
-        <span className="font-mono text-xs text-[#71717A]">
+        <span className="text-xs font-medium tabular-nums text-[#71717A]">
           Step {step} of 2
         </span>
       </div>
@@ -353,8 +353,8 @@ export const PracticeWizard: React.FC = () => {
       {step === 1 && (
         <div className="space-y-8">
           <div>
-            <p className="text-xs font-medium text-[#D6CEBF]">Step 1</p>
-            <h1 className="mt-1 font-editorial text-3xl sm:text-4xl text-[#F5F5F5] tracking-tight">
+            <p className="text-xs font-medium text-white">Step 1</p>
+            <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
               What do you want to practice?
             </h1>
             <p className="mt-2 text-sm text-[#A1A1AA]">
@@ -374,8 +374,8 @@ export const PracticeWizard: React.FC = () => {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-[#A1A1AA]">
-                  SECTION 01
+                <span className="text-xs font-medium text-[#A1A1AA]">
+                  Section 1
                 </span>
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
@@ -387,7 +387,7 @@ export const PracticeWizard: React.FC = () => {
                   {subject === 'rw' && <Check className="h-3 w-3 stroke-[2.5]" />}
                 </span>
               </div>
-              <h2 className="mt-4 font-editorial text-3xl text-[#F5F5F5]">
+              <h2 className="mt-4 font-editorial text-xl sm:text-2xl text-[#F5F5F5]">
                 Reading &amp; Writing
               </h2>
               <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
@@ -396,7 +396,7 @@ export const PracticeWizard: React.FC = () => {
               </p>
               <div className="mt-6 pt-4 border-t border-[#1F1F23] flex items-center justify-between text-xs text-[#71717A]">
                 <span>4 official domains</span>
-                <span className="font-mono text-[#A1A1AA]">
+                <span className="font-medium tabular-nums text-[#A1A1AA]">
                   {rwTotalCount.toLocaleString()} questions
                 </span>
               </div>
@@ -413,8 +413,8 @@ export const PracticeWizard: React.FC = () => {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-[#A1A1AA]">
-                  SECTION 02
+                <span className="text-xs font-medium text-[#A1A1AA]">
+                  Section 2
                 </span>
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
@@ -428,7 +428,7 @@ export const PracticeWizard: React.FC = () => {
                   )}
                 </span>
               </div>
-              <h2 className="mt-4 font-editorial text-3xl text-[#F5F5F5]">
+              <h2 className="mt-4 font-editorial text-xl sm:text-2xl text-[#F5F5F5]">
                 Math
               </h2>
               <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
@@ -437,7 +437,7 @@ export const PracticeWizard: React.FC = () => {
               </p>
               <div className="mt-6 pt-4 border-t border-[#1F1F23] flex items-center justify-between text-xs text-[#71717A]">
                 <span>4 official domains</span>
-                <span className="font-mono text-[#A1A1AA]">
+                <span className="font-medium tabular-nums text-[#A1A1AA]">
                   {mathTotalCount.toLocaleString()} questions
                 </span>
               </div>
@@ -464,10 +464,10 @@ export const PracticeWizard: React.FC = () => {
       {step === 2 && (
         <div className="space-y-8">
           <div>
-            <p className="text-xs font-medium text-[#D6CEBF]">
+            <p className="text-xs font-medium text-white">
               Step 2 • {subject === 'rw' ? 'Reading & Writing' : 'Math'}
             </p>
-            <h1 className="mt-1 font-editorial text-3xl sm:text-4xl text-[#F5F5F5] tracking-tight">
+            <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
               Choose your focus &amp; difficulty
             </h1>
             <p className="mt-1.5 text-sm text-[#A1A1AA]">
@@ -511,18 +511,8 @@ export const PracticeWizard: React.FC = () => {
                         <div className="text-base font-medium text-[#F5F5F5]">
                           {dom.text}
                         </div>
-                        <div className="mt-0.5 text-xs text-[#71717A]">
-                          {dom.skills.length} skills •{' '}
-                          <span className="font-mono">
-                            {dom.questionCount}
-                          </span>{' '}
-                          questions
-                          {activeSkillsInDom.length > 0 && (
-                            <span className="ml-2 text-[#D6CEBF]">
-                              ({activeSkillsInDom.length} skill
-                              {activeSkillsInDom.length > 1 ? 's' : ''} selected)
-                            </span>
-                          )}
+                        <div className="mt-0.5 text-xs text-[#71717A] tabular-nums">
+                          {dom.skills.length} skills • {dom.questionCount} questions
                         </div>
                       </div>
                     </div>
@@ -545,7 +535,7 @@ export const PracticeWizard: React.FC = () => {
                           }`}
                         >
                           <span className="line-clamp-1">{sk.text}</span>
-                          <span className="font-mono text-[11px] text-[#71717A] shrink-0">
+                          <span className="text-xs tabular-nums text-[#71717A] shrink-0">
                             {sk.questionCount}
                           </span>
                         </button>
@@ -616,7 +606,7 @@ export const PracticeWizard: React.FC = () => {
                         </span>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 font-mono text-[11px] text-[#A1A1AA]">
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#29292E] bg-[#111113] px-2 py-0.5 text-xs tabular-nums text-[#A1A1AA]">
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${d.dotColor}`}
                         />
@@ -626,7 +616,7 @@ export const PracticeWizard: React.FC = () => {
                       </span>
                     </div>
 
-                    <p className="mt-2.5 text-[11.5px] leading-snug text-[#71717A]">
+                    <p className="mt-2.5 text-xs leading-snug text-[#71717A]">
                       {d.description}
                     </p>
                   </button>
@@ -674,7 +664,7 @@ export const PracticeWizard: React.FC = () => {
                   'Select at least 1 skill and 1 difficulty to begin'
                 ) : (
                   <span>
-                    <strong className="font-mono text-[#F5F5F5]">
+                    <strong className="font-semibold tabular-nums text-[#F5F5F5]">
                       {maxAvailableQuestions.toLocaleString()}
                     </strong>{' '}
                     matching questions ready

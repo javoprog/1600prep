@@ -1,4 +1,5 @@
-import { loadUserSettings } from '@/services/storage/preferences';
+import { UserSettings } from '@/types';
+import { DEFAULT_USER_SETTINGS } from '@/services/storage/preferences';
 
 export type SoundEvent =
   | 'hover'
@@ -22,6 +23,11 @@ class SoundEngine {
   private ctx: AudioContext | null = null;
   private lastHoverTime = 0;
   private lastClickTime = 0;
+  private settings: UserSettings = { ...DEFAULT_USER_SETTINGS };
+
+  public setSettings(next: UserSettings): void {
+    this.settings = { ...next };
+  }
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -40,8 +46,7 @@ class SoundEngine {
   }
 
   public play(event: SoundEvent): void {
-    const settings = loadUserSettings();
-    if (!settings.soundEnabled || settings.soundVolume <= 0) return;
+    if (!this.settings.soundEnabled || this.settings.soundVolume <= 0) return;
 
     const nowMs = performance.now();
     if (event === 'hover') {
@@ -60,8 +65,7 @@ class SoundEngine {
     const ctx = this.getContext();
     if (!ctx) return;
 
-    // Boost overall volume so UI interactions feel tactile and clearly audible
-    const vol = Math.min(1, Math.max(0.85, settings.soundVolume));
+    const vol = Math.min(1, Math.max(0, this.settings.soundVolume));
     const now = ctx.currentTime;
 
     try {

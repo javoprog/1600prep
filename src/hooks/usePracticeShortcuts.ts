@@ -16,7 +16,6 @@ export interface UsePracticeShortcutsParams {
   onPrevQuestion: () => void;
   onNextQuestion: () => void;
   onToggleScratchpad: () => void;
-  onToggleCheatSheet: () => void;
   onEscape: () => boolean; // returns true if an overlay/modal was closed
 }
 
@@ -33,7 +32,6 @@ export function usePracticeShortcuts({
   onPrevQuestion,
   onNextQuestion,
   onToggleScratchpad,
-  onToggleCheatSheet,
   onEscape,
 }: UsePracticeShortcutsParams): void {
   useEffect(() => {
@@ -61,13 +59,6 @@ export function usePracticeShortcuts({
           e.preventDefault();
           soundEngine.play('toggleClose');
         }
-        return;
-      }
-
-      // '?': toggle keyboard shortcut cheat-sheet modal
-      if (e.key === '?') {
-        e.preventDefault();
-        onToggleCheatSheet();
         return;
       }
 
@@ -167,7 +158,6 @@ export function usePracticeShortcuts({
     onPrevQuestion,
     onNextQuestion,
     onToggleScratchpad,
-    onToggleCheatSheet,
     onEscape,
   ]);
 }

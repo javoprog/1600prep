@@ -107,6 +107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Purely in-memory settings (no user data persisted)
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
@@ -166,8 +167,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     reloadCatalog();
   }, [reloadCatalog]);
 
+  useEffect(() => {
+    settingsRef.current = settings;
+    soundEngine.setSettings(settings);
+  }, [settings]);
+
   const updateSettings = useCallback((partial: Partial<UserSettings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }));
+    const next = { ...settingsRef.current, ...partial };
+    settingsRef.current = next;
+    soundEngine.setSettings(next);
+    setSettings(next);
   }, []);
 
   const startPracticeSession = useCallback(

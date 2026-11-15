@@ -48,7 +48,7 @@ export function getDifficultyBadgeInfo(difficulty?: 'E' | 'M' | 'H' | null): {
   if (difficulty === 'M') {
     return {
       label: 'Medium',
-      className: 'bg-[#18181B] text-[#D6CEBF] border-[#29292E]',
+      className: 'bg-[#18181B] text-[#FFFFFF] border-[#29292E]',
     };
   }
   if (difficulty === 'H') {
