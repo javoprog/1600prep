@@ -1,10 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  ArrowRight,
-  RotateCcw,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Button3D } from '@/components/ui/Button3D';
 import {
@@ -20,7 +17,6 @@ export const SessionSummary: React.FC = () => {
     setIsSessionSummaryView,
     goToQuestionIndex,
     startPracticeSession,
-    closeActiveSession,
     metaMap,
   } = useApp();
 
@@ -77,14 +73,6 @@ export const SessionSummary: React.FC = () => {
       'mistakes',
       `Mistakes Review — ${activeSession.title}`,
       mistakeQuestionIds
-    );
-  };
-
-  const handlePracticeAgain = async () => {
-    await startPracticeSession(
-      activeSession.filters,
-      activeSession.mode,
-      activeSession.title
     );
   };
 
@@ -169,20 +157,6 @@ export const SessionSummary: React.FC = () => {
               <span>Retry Mistakes ({mistakeQuestionIds.length})</span>
             </Button3D>
           )}
-
-          <Button3D variant="secondary" size="lg" onClick={handlePracticeAgain}>
-            <RotateCcw className="h-4 w-4" />
-            <span>Practice Again</span>
-          </Button3D>
-
-          <Button3D
-            variant="ghost"
-            size="lg"
-            onClick={closeActiveSession}
-            className="sm:ml-auto"
-          >
-            <span>Return to Practice</span>
-          </Button3D>
         </div>
       </div>
 

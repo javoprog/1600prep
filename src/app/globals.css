@@ -34,6 +34,10 @@ body {
   min-height: 100vh;
 }
 
+body {
+  overflow-x: clip;
+}
+
 .font-editorial {
   font-family: var(--font-serif), var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
@@ -153,26 +157,57 @@ body {
   border-color: #692B30;
 }
 
-/* Micro-animations (120–300ms) */
-@keyframes wizardStepIn {
+/* Micro-animations (subtle, responsive page & UI transitions) */
+@keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateX(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
+  }
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes contentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes wizardStepIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
 @keyframes wizardStepBackIn {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateX(-8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -183,7 +218,7 @@ body {
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: none;
   }
 }
 
@@ -198,7 +233,7 @@ body {
   }
   100% {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -210,35 +245,36 @@ body {
     transform: scale(1.16);
   }
   100% {
-    transform: scale(1);
+    transform: none;
   }
 }
 
-@keyframes completionFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.animate-page-in {
+  animation: pageEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-page-fade {
+  animation: pageFadeIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-content-in {
+  animation: contentEnter 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-wizard-forward {
-  animation: wizardStepIn 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: wizardStepIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-wizard-backward {
-  animation: wizardStepBackIn 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: wizardStepBackIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-feedback-correct {
-  animation: feedbackCorrectIn 200ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: feedbackCorrectIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-feedback-incorrect {
-  animation: feedbackIncorrectIn 200ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: feedbackIncorrectIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-bookmark-pop {
@@ -246,7 +282,7 @@ body {
 }
 
 .animate-completion {
-  animation: completionFadeUp 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: pageEnter 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Rich SAT Question Content Typography & Media Styling */
@@ -331,16 +367,38 @@ body {
 }
 
 /* Tables inside passages/stems */
-.sat-rich-content figure.table,
-.sat-rich-content table:not(.table_Borderless) {
+.sat-rich-content figure.table {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.sat-rich-content .sat-table-wrap {
   width: 100%;
-  margin: 1.1rem 0;
+  margin: 1.15rem 0;
+  border: 1px solid #29292E;
+  border-radius: 0.625rem;
+  background-color: #111113;
+  overflow-x: auto;
+}
+
+.sat-rich-content .sat-table-wrap > table:not(.table_Borderless) {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  border-style: hidden;
+  font-size: 0.975rem;
+  background-color: transparent;
+}
+
+.sat-rich-content table:not(.table_Borderless):not(.sat-table-wrapped) {
+  width: 100%;
+  margin: 1.15rem 0;
   border-collapse: collapse;
   font-size: 0.975rem;
   background-color: #111113;
   border: 1px solid #29292E;
-  border-radius: 0.5rem;
-  overflow: hidden;
 }
 
 .sat-rich-content table caption {
@@ -349,22 +407,37 @@ body {
   color: #F5F5F5;
   background-color: #18181B;
   border-bottom: 1px solid #29292E;
+  text-align: center;
 }
 
 .sat-rich-content table:not(.table_Borderless) th,
 .sat-rich-content table:not(.table_Borderless) td {
   padding: 0.65rem 0.95rem;
   border: 1px solid #29292E;
+  vertical-align: middle;
 }
 
-.sat-rich-content table:not(.table_Borderless) thead th {
+.sat-rich-content table:not(.table_Borderless) th {
   background-color: #18181B;
-  color: #E4E4E7;
+  color: #F5F5F5;
   font-weight: 600;
 }
 
+.sat-rich-content table:not(.table_Borderless) td p,
+.sat-rich-content table:not(.table_Borderless) th p {
+  margin-bottom: 0;
+}
+
 .sat-rich-content table:not(.table_Borderless) tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.015);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.sat-rich-content .para_center {
+  text-align: center;
+}
+
+.sat-rich-content .para_right {
+  text-align: right;
 }
 
 /* Borderless layout tables (e.g. systems of equations in disclosed items) */

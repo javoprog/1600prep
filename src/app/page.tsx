@@ -11,10 +11,10 @@ export default function HomePage() {
 
   if (activeSession) {
     if (isSessionSummaryView) {
-      return <SessionSummary />;
+      return <SessionSummary key={`summary-${activeSession.id}`} />;
     }
-    return <QuestionSolver />;
+    return <QuestionSolver key={`solver-${activeSession.id}`} />;
   }
 
-  return <PracticeHome />;
+  return <PracticeHome key="practice-home" />;
 }

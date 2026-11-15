@@ -27,6 +27,7 @@ import { RichMathContent } from '@/components/question/RichMathContent';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Button3D } from '@/components/ui/Button3D';
 import {
+  CalculatorLayout,
   MathCalculatorPanel,
   MathReferenceSheet,
   SprDirectionsWindow,
@@ -63,10 +64,47 @@ export const QuestionSolver: React.FC = () => {
   const [scratchpadMap, setScratchpadMap] = useState<Record<string, ScratchpadStroke[]>>({});
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
+  const [calculatorLayout, setCalculatorLayout] =
+    useState<CalculatorLayout>('floating');
+  const [calculatorDockWidth, setCalculatorDockWidth] = useState<number>(520);
+  const [isResizingDock, setIsResizingDock] = useState<boolean>(false);
+  const [footerHeight, setFooterHeight] = useState<number>(65);
+  const [isDesktopSmUp, setIsDesktopSmUp] = useState<boolean>(true);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
   const [isTimerHidden, setIsTimerHidden] = useState<boolean>(false);
   const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
+  const footerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncViewport = () => {
+      const vw = window.innerWidth;
+      setIsDesktopSmUp(vw >= 640);
+      setCalculatorDockWidth((prev) => {
+        const preferred = Math.min(580, Math.max(360, Math.round(vw * 0.45)));
+        const maxAllowed = Math.max(360, Math.round(vw * 0.58));
+        if (prev === 520 && vw < 1200) return preferred;
+        return Math.min(Math.max(340, prev), maxAllowed);
+      });
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    const el = footerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const syncFooter = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setFooterHeight(h);
+    };
+    syncFooter();
+    const observer = new ResizeObserver(syncFooter);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Per-question stopwatch that resets to 0 on each question
   const [questionTimerMs, setQuestionTimerMs] = useState<number>(0);
@@ -341,9 +379,14 @@ export const QuestionSolver: React.FC = () => {
   // In Bluebook Digital SAT, only Reading & Writing uses the 2-column Passage/Question split;
   // Math is always a single column with any stimulus equation/table/graph directly above the stem.
   const useSplitPassageColumn = hasPassage && !isMathSubject;
+  const isCalculatorDocked =
+    isMathSubject &&
+    isCalculatorOpen &&
+    calculatorLayout !== 'floating' &&
+    isDesktopSmUp;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0A0B] text-[#F5F5F5]">
+    <div className="flex min-h-screen flex-col bg-[#0A0A0B] text-[#F5F5F5] animate-page-fade">
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
@@ -476,11 +519,17 @@ export const QuestionSolver: React.FC = () => {
         </div>
       </header>
 
-      {/* Floating SAT Math Calculator, Reference Sheet & SPR Directions Windows */}
+      {/* Floating & Dockable SAT Math Calculator, Reference Sheet & SPR Directions Windows */}
       {isMathSubject && (
         <>
           <MathCalculatorPanel
             isOpen={isCalculatorOpen}
+            layout={calculatorLayout}
+            dockWidth={calculatorDockWidth}
+            footerHeight={footerHeight}
+            onChangeLayout={setCalculatorLayout}
+            onChangeDockWidth={setCalculatorDockWidth}
+            onResizingDockChange={setIsResizingDock}
             onClose={() => {
               soundEngine.play('toggleClose');
               setIsCalculatorOpen(false);
@@ -504,7 +553,23 @@ export const QuestionSolver: React.FC = () => {
       />
 
       {/* Full-Screen Examination Area (between Header and Footer) */}
-      <main className="relative flex w-full flex-1 flex-col">
+      <main
+        style={{
+          paddingLeft:
+            isCalculatorDocked && calculatorLayout === 'left'
+              ? `${calculatorDockWidth}px`
+              : undefined,
+          paddingRight:
+            isCalculatorDocked && calculatorLayout === 'right'
+              ? `${calculatorDockWidth}px`
+              : undefined,
+        }}
+        className={`relative flex w-full flex-1 flex-col ${
+          isResizingDock
+            ? 'transition-none'
+            : 'transition-[padding] duration-200 ease-out'
+        }`}
+      >
         {/* Transparent Full-Screen HTML5 Canvas Scratchpad Overlay */}
         <ScratchpadOverlay
           isOpen={isScratchpadOpen}
@@ -528,7 +593,7 @@ export const QuestionSolver: React.FC = () => {
             </p>
           </div>
         ) : questionError || !question ? (
-          <div className="mx-auto my-16 max-w-md rounded-2xl border border-[#4C2024] bg-[#111113] p-7 text-center">
+          <div className="mx-auto my-16 max-w-md rounded-2xl border border-[#4C2024] bg-[#111113] p-7 text-center animate-content-in">
             <AlertCircle className="mx-auto h-7 w-7 text-red-400" />
             <h3 className="mt-3 font-editorial text-2xl text-[#F5F5F5]">
               Unable to Load Question
@@ -549,7 +614,8 @@ export const QuestionSolver: React.FC = () => {
           </div>
         ) : (
           <div
-            className={`grid flex-1 gap-8 lg:gap-12 ${
+            key={question.id}
+            className={`grid flex-1 gap-8 lg:gap-12 animate-content-in ${
               useSplitPassageColumn
                 ? 'grid-cols-1 lg:grid-cols-12 items-start'
                 : 'mx-auto w-full max-w-3xl grid-cols-1'
@@ -981,7 +1047,10 @@ export const QuestionSolver: React.FC = () => {
       </main>
 
       {/* Bottom Examination Navigation Bar */}
-      <footer className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md">
+      <footer
+        ref={footerRef}
+        className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-2.5 sm:px-6 sm:py-3">
           <Button3D
             variant="secondary"

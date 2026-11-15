@@ -125,148 +125,28 @@ function useDraggableWindow(initialPosition: WindowPosition, approxWidth = 600) 
   };
 }
 
-function useDraggableResizableWindow(
-  initialBounds: WindowBounds,
-  minWidth = 320,
-  minHeight = 320
-) {
-  const [bounds, setBounds] = useState<WindowBounds>(initialBounds);
-  const [isInteracting, setIsInteracting] = useState(false);
+export type CalculatorLayout = 'floating' | 'left' | 'right';
 
-  const interactionRef = useRef<{
-    mode: 'drag' | 'resize' | null;
-    dir?: ResizeDirection;
-    startX: number;
-    startY: number;
-    startBounds: WindowBounds;
-  }>({
-    mode: null,
-    startX: 0,
-    startY: 0,
-    startBounds: initialBounds,
-  });
+const PresetLeftIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
+  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
+    <rect x="3" y="4" width="5" height="8" rx="1" fill="currentColor" />
+  </svg>
+);
 
-  // Clamp initial position once window dimensions are available on client
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setBounds((prev) => {
-      const maxW = Math.max(minWidth, window.innerWidth - 24);
-      const maxH = Math.max(minHeight, window.innerHeight - 80);
-      const width = Math.min(prev.width, maxW);
-      const height = Math.min(prev.height, maxH);
-      const x = Math.max(12, Math.min(prev.x, window.innerWidth - width - 12));
-      const y = Math.max(60, Math.min(prev.y, window.innerHeight - height - 12));
-      return { x, y, width, height };
-    });
-  }, [minWidth, minHeight]);
+const PresetFloatIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
+  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" opacity="0.55" />
+    <rect x="3.5" y="4.5" width="7" height="5.5" rx="1.2" fill="currentColor" />
+  </svg>
+);
 
-  const startDrag = useCallback(
-    (e: React.PointerEvent) => {
-      if ((e.target as HTMLElement).closest('button, a')) return;
-      e.preventDefault();
-      interactionRef.current = {
-        mode: 'drag',
-        startX: e.clientX,
-        startY: e.clientY,
-        startBounds: bounds,
-      };
-      setIsInteracting(true);
-    },
-    [bounds]
-  );
-
-  const startResize = useCallback(
-    (dir: ResizeDirection, e: React.PointerEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      interactionRef.current = {
-        mode: 'resize',
-        dir,
-        startX: e.clientX,
-        startY: e.clientY,
-        startBounds: bounds,
-      };
-      setIsInteracting(true);
-    },
-    [bounds]
-  );
-
-  useEffect(() => {
-    if (!isInteracting) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const state = interactionRef.current;
-      if (!state.mode) return;
-
-      const dx = e.clientX - state.startX;
-      const dy = e.clientY - state.startY;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      if (state.mode === 'drag') {
-        const nextX = Math.max(
-          8,
-          Math.min(vw - state.startBounds.width - 8, state.startBounds.x + dx)
-        );
-        const nextY = Math.max(
-          56,
-          Math.min(vh - 60, state.startBounds.y + dy)
-        );
-        setBounds((prev) => ({
-          ...prev,
-          x: nextX,
-          y: nextY,
-        }));
-      } else if (state.mode === 'resize' && state.dir) {
-        let { x, y, width, height } = state.startBounds;
-        const dir = state.dir;
-
-        if (dir.includes('e')) {
-          width = Math.min(vw - x - 8, Math.max(minWidth, width + dx));
-        }
-        if (dir.includes('s')) {
-          height = Math.min(vh - y - 8, Math.max(minHeight, height + dy));
-        }
-        if (dir.includes('w')) {
-          const maxDeltaLeft = width - minWidth;
-          const clampedDx = Math.max(-x + 8, Math.min(maxDeltaLeft, dx));
-          x += clampedDx;
-          width -= clampedDx;
-        }
-        if (dir.includes('n')) {
-          const maxDeltaTop = height - minHeight;
-          const clampedDy = Math.max(56 - y, Math.min(maxDeltaTop, dy));
-          y += clampedDy;
-          height -= clampedDy;
-        }
-
-        setBounds({ x, y, width, height });
-      }
-    };
-
-    const handlePointerUp = () => {
-      interactionRef.current.mode = null;
-      setIsInteracting(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-    };
-  }, [isInteracting, minWidth, minHeight]);
-
-  return {
-    bounds,
-    setBounds,
-    isInteracting,
-    startDrag,
-    startResize,
-  };
-}
+const PresetRightIcon: React.FC<{ className?: string }> = ({ className = 'h-3.5 w-3.5' }) => (
+  <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+    <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
+    <rect x="8" y="4" width="5" height="8" rx="1" fill="currentColor" />
+  </svg>
+);
 
 interface ResizeHandlesProps {
   onStartResize: (dir: ResizeDirection, e: React.PointerEvent) => void;
@@ -314,26 +194,87 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ onStartResize }) => (
 
 interface MathCalculatorPanelProps {
   isOpen: boolean;
+  layout: CalculatorLayout;
+  dockWidth: number;
+  footerHeight: number;
+  onChangeLayout: (layout: CalculatorLayout) => void;
+  onChangeDockWidth: (width: number) => void;
+  onResizingDockChange?: (isResizing: boolean) => void;
   onClose: () => void;
 }
 
+type CalculatorInteractionState =
+  | {
+      mode: 'floating-drag';
+      startX: number;
+      startY: number;
+      startBounds: WindowBounds;
+    }
+  | {
+      mode: 'floating-resize';
+      dir: ResizeDirection;
+      startX: number;
+      startY: number;
+      startBounds: WindowBounds;
+    }
+  | {
+      mode: 'docked-pending-unsnap';
+      fromDock: 'left' | 'right';
+      startX: number;
+      startY: number;
+      floatSize: { width: number; height: number };
+    }
+  | {
+      mode: 'docked-resize';
+      dockSide: 'left' | 'right';
+    }
+  | { mode: null };
+
 export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
   isOpen,
+  layout,
+  dockWidth,
+  footerHeight,
+  onChangeLayout,
+  onChangeDockWidth,
+  onResizingDockChange,
   onClose,
 }) => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [bounds, setBounds] = useState<WindowBounds>({
+    x: 24,
+    y: 76,
+    width: 470,
+    height: 580,
+  });
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [snapPreview, setSnapPreview] = useState<'left' | 'right' | null>(null);
 
-  const { bounds, isInteracting, startDrag, startResize } =
-    useDraggableResizableWindow(
-      {
-        x: 24,
-        y: 72,
-        width: 470,
-        height: 580,
-      },
-      340,
-      380
-    );
+  const minFloatWidth = 340;
+  const minFloatHeight = 380;
+
+  const snapPreviewRef = useRef<'left' | 'right' | null>(null);
+  const lastDockedSideRef = useRef<'left' | 'right'>('left');
+  const interactionRef = useRef<CalculatorInteractionState>({ mode: null });
+
+  useEffect(() => {
+    if (layout === 'left' || layout === 'right') {
+      lastDockedSideRef.current = layout;
+    }
+  }, [layout]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setBounds((prev) => {
+      const maxW = Math.max(minFloatWidth, window.innerWidth - 24);
+      const maxH = Math.max(minFloatHeight, window.innerHeight - 96);
+      const width = Math.min(prev.width, maxW);
+      const height = Math.min(prev.height, maxH);
+      const x = Math.max(12, Math.min(prev.x, window.innerWidth - width - 12));
+      const y = Math.max(68, Math.min(prev.y, window.innerHeight - height - 12));
+      return { x, y, width, height };
+    });
+  }, []);
 
   useEffect(() => {
     if (isOpen && !hasLoadedOnce) {
@@ -341,81 +282,404 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
     }
   }, [isOpen, hasLoadedOnce]);
 
+  const handleHeaderPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if ((e.target as HTMLElement).closest('button, a')) return;
+      e.preventDefault();
+
+      if (layout === 'floating') {
+        interactionRef.current = {
+          mode: 'floating-drag',
+          startX: e.clientX,
+          startY: e.clientY,
+          startBounds: bounds,
+        };
+      } else {
+        interactionRef.current = {
+          mode: 'docked-pending-unsnap',
+          fromDock: layout,
+          startX: e.clientX,
+          startY: e.clientY,
+          floatSize: { width: bounds.width, height: bounds.height },
+        };
+      }
+      setIsInteracting(true);
+    },
+    [layout, bounds]
+  );
+
+  const handleStartFloatingResize = useCallback(
+    (dir: ResizeDirection, e: React.PointerEvent) => {
+      if (layout !== 'floating') return;
+      e.preventDefault();
+      e.stopPropagation();
+      interactionRef.current = {
+        mode: 'floating-resize',
+        dir,
+        startX: e.clientX,
+        startY: e.clientY,
+        startBounds: bounds,
+      };
+      setIsInteracting(true);
+    },
+    [layout, bounds]
+  );
+
+  const handleStartDockResize = useCallback(
+    (e: React.PointerEvent) => {
+      if (layout === 'floating') return;
+      e.preventDefault();
+      e.stopPropagation();
+      interactionRef.current = {
+        mode: 'docked-resize',
+        dockSide: layout,
+      };
+      onResizingDockChange?.(true);
+      setIsInteracting(true);
+    },
+    [layout, onResizingDockChange]
+  );
+
+  useEffect(() => {
+    if (!isInteracting) return;
+
+    const updateSnapPreview = (next: 'left' | 'right' | null) => {
+      if (snapPreviewRef.current !== next) {
+        snapPreviewRef.current = next;
+        setSnapPreview(next);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const state = interactionRef.current;
+      if (!state.mode) return;
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      if (state.mode === 'docked-pending-unsnap') {
+        const dist = Math.hypot(
+          e.clientX - state.startX,
+          e.clientY - state.startY
+        );
+        if (dist <= 10) return;
+
+        const w = Math.min(state.floatSize.width, Math.max(minFloatWidth, vw - 24));
+        const h = Math.min(state.floatSize.height, Math.max(minFloatHeight, vh - 96));
+        const fx = Math.max(
+          8,
+          Math.min(vw - w - 8, Math.round(e.clientX - w / 2))
+        );
+        const fy = Math.max(68, Math.min(vh - 80, Math.round(e.clientY - 18)));
+        const nextFloatBounds: WindowBounds = { x: fx, y: fy, width: w, height: h };
+
+        interactionRef.current = {
+          mode: 'floating-drag',
+          startX: e.clientX,
+          startY: e.clientY,
+          startBounds: nextFloatBounds,
+        };
+        setBounds(nextFloatBounds);
+        onChangeLayout('floating');
+        return;
+      }
+
+      if (state.mode === 'floating-drag') {
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        const rawX = state.startBounds.x + dx;
+        const nextX = Math.max(
+          8,
+          Math.min(vw - state.startBounds.width - 8, rawX)
+        );
+        const nextY = Math.max(
+          68,
+          Math.min(vh - 60, state.startBounds.y + dy)
+        );
+
+        let nextSnap: 'left' | 'right' | null = null;
+        if (vw >= 640) {
+          if (e.clientX <= 56 || rawX <= -56) {
+            nextSnap = 'left';
+          } else if (
+            e.clientX >= vw - 56 ||
+            rawX + state.startBounds.width >= vw + 56
+          ) {
+            nextSnap = 'right';
+          }
+        }
+        updateSnapPreview(nextSnap);
+        setBounds((prev) => ({ ...prev, x: nextX, y: nextY }));
+        return;
+      }
+
+      if (state.mode === 'docked-resize') {
+        const maxDock = Math.max(380, Math.round(vw * 0.58));
+        const minDock = 340;
+        const rawWidth =
+          state.dockSide === 'left' ? e.clientX : vw - e.clientX;
+        const clampedWidth = Math.max(minDock, Math.min(maxDock, Math.round(rawWidth)));
+        onChangeDockWidth(clampedWidth);
+        return;
+      }
+
+      if (state.mode === 'floating-resize') {
+        let { x, y, width, height } = state.startBounds;
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        const dir = state.dir;
+
+        if (dir.includes('e')) {
+          width = Math.min(vw - x - 8, Math.max(minFloatWidth, width + dx));
+        }
+        if (dir.includes('s')) {
+          height = Math.min(vh - y - 8, Math.max(minFloatHeight, height + dy));
+        }
+        if (dir.includes('w')) {
+          const maxDeltaLeft = width - minFloatWidth;
+          const clampedDx = Math.max(-x + 8, Math.min(maxDeltaLeft, dx));
+          x += clampedDx;
+          width -= clampedDx;
+        }
+        if (dir.includes('n')) {
+          const maxDeltaTop = height - minFloatHeight;
+          const clampedDy = Math.max(68 - y, Math.min(maxDeltaTop, dy));
+          y += clampedDy;
+          height -= clampedDy;
+        }
+
+        setBounds({ x, y, width, height });
+      }
+    };
+
+    const handlePointerUp = () => {
+      const pendingSnap = snapPreviewRef.current;
+      snapPreviewRef.current = null;
+      setSnapPreview(null);
+      interactionRef.current = { mode: null };
+      setIsInteracting(false);
+      onResizingDockChange?.(false);
+
+      if (pendingSnap) {
+        lastDockedSideRef.current = pendingSnap;
+        onChangeLayout(pendingSnap);
+        soundEngine.play('toggleOpen');
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [isInteracting, onChangeLayout, onChangeDockWidth, onResizingDockChange]);
+
+  const selectLayoutPreset = (nextLayout: CalculatorLayout) => {
+    if (nextLayout === layout) return;
+    soundEngine.play('click');
+    if (nextLayout !== 'floating') {
+      lastDockedSideRef.current = nextLayout;
+    }
+    onChangeLayout(nextLayout);
+  };
+
   if (!isOpen && !hasLoadedOnce) {
     return null;
   }
 
-  return (
-    <div
-      style={{
+  const isDocked = layout !== 'floating';
+
+  const panelStyle: React.CSSProperties = isDocked
+    ? {
+        top: '64px',
+        bottom: `${footerHeight}px`,
+        width: `${dockWidth}px`,
+        ...(layout === 'left' ? { left: 0 } : { right: 0 }),
+      }
+    : {
         left: `${bounds.x}px`,
         top: `${bounds.y}px`,
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
-      }}
-      className={`fixed z-40 flex flex-col rounded-xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none ${
-        isOpen
-          ? 'opacity-100 pointer-events-auto'
-          : 'opacity-0 pointer-events-none hidden'
-      }`}
-      role="dialog"
-      aria-label="Graphing Calculator"
-    >
-      <ResizeHandles onStartResize={startResize} />
+      };
 
-      {/* Draggable Window Title Bar */}
+  return (
+    <>
+      {/* Windows-style Dock Snap Ghost Preview */}
+      {isOpen && snapPreview && (
+        <div
+          style={{
+            top: '72px',
+            bottom: `${footerHeight + 8}px`,
+            width: `${Math.max(300, dockWidth - 16)}px`,
+            ...(snapPreview === 'left' ? { left: '8px' } : { right: '8px' }),
+          }}
+          className="hidden sm:flex fixed z-30 pointer-events-none items-center justify-center rounded-xl border-2 border-[#69ff00]/65 bg-[#69ff00]/[0.08] backdrop-blur-[2px] transition-all duration-150"
+          aria-hidden="true"
+        >
+          <div className="rounded-lg border border-[#69ff00]/40 bg-[#111113]/95 px-3 py-1.5 text-xs font-medium text-[#69ff00] shadow-lg">
+            {snapPreview === 'left' ? 'Snap Left' : 'Snap Right'}
+          </div>
+        </div>
+      )}
+
       <div
-        onPointerDown={startDrag}
-        className="flex items-center justify-between rounded-t-xl border-b border-[#29292E] bg-[#18181B] px-3.5 py-2 cursor-move"
+        style={panelStyle}
+        className={`fixed flex flex-col bg-[#111113] select-none ${
+          isDocked
+            ? `z-30 rounded-none ${
+                layout === 'left'
+                  ? 'border-r border-[#29292E]'
+                  : 'border-l border-[#29292E]'
+              } shadow-[0_12px_40px_rgba(0,0,0,0.45)]`
+            : 'z-40 rounded-xl border border-[#3F3F46] shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
+        } ${
+          isOpen
+            ? 'hidden sm:flex opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none hidden'
+        }`}
+        role="dialog"
+        aria-label="Graphing Calculator"
       >
-        <div className="flex items-center gap-2">
-          <GripHorizontal className="h-4 w-4 text-[#71717A]" />
-          <span className="text-xs font-semibold text-[#F5F5F5]">
-            Calculator
-          </span>
+        {!isDocked && (
+          <ResizeHandles onStartResize={handleStartFloatingResize} />
+        )}
+
+        {/* Inner-edge Split Width Resizer when Docked Left/Right */}
+        {isDocked && (
+          <div
+            onPointerDown={handleStartDockResize}
+            className={`group absolute top-0 bottom-0 z-30 flex w-2 cursor-col-resize items-center justify-center ${
+              layout === 'left' ? '-right-1' : '-left-1'
+            }`}
+            title="Drag to resize calculator width"
+            aria-label="Resize docked calculator"
+          >
+            <div className="h-12 w-0.5 rounded-full bg-[#3F3F46] opacity-0 transition-opacity group-hover:bg-[#69ff00] group-hover:opacity-100" />
+          </div>
+        )}
+
+        {/* Draggable Window Title Bar + Preset Layout Switcher */}
+        <div
+          onPointerDown={handleHeaderPointerDown}
+          onDoubleClick={(e) => {
+            if ((e.target as HTMLElement).closest('button, a')) return;
+            selectLayoutPreset(
+              layout === 'floating' ? lastDockedSideRef.current : 'floating'
+            );
+          }}
+          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3 py-2 cursor-move ${
+            isDocked ? '' : 'rounded-t-xl'
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <GripHorizontal className="h-4 w-4 shrink-0 text-[#71717A]" />
+            <span className="text-xs font-semibold text-[#F5F5F5] truncate">
+              Calculator
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Preset Layout Switcher: Left Split / Floating / Right Split */}
+            <div
+              className="flex items-center gap-0.5 rounded-md border border-[#29292E] bg-[#111113] p-0.5"
+              role="group"
+              aria-label="Calculator layout presets"
+            >
+              <button
+                type="button"
+                onClick={() => selectLayoutPreset('left')}
+                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
+                  layout === 'left'
+                    ? 'bg-[#27272A] text-[#69ff00]'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+                title="Snap to left side"
+                aria-label="Snap calculator to left side"
+                aria-pressed={layout === 'left'}
+              >
+                <PresetLeftIcon />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectLayoutPreset('floating')}
+                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
+                  layout === 'floating'
+                    ? 'bg-[#27272A] text-[#69ff00]'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+                title="Floating window"
+                aria-label="Floating calculator window"
+                aria-pressed={layout === 'floating'}
+              >
+                <PresetFloatIcon />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectLayoutPreset('right')}
+                className={`flex h-6 w-6 items-center justify-center rounded transition-colors cursor-pointer ${
+                  layout === 'right'
+                    ? 'bg-[#27272A] text-[#69ff00]'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+                title="Snap to right side"
+                aria-label="Snap calculator to right side"
+                aria-pressed={layout === 'right'}
+              >
+                <PresetRightIcon />
+              </button>
+            </div>
+
+            <a
+              href="https://www.desmos.com/testing/cb-digital-sat/graphing"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => soundEngine.play('click')}
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              title="Open calculator in new tab"
+              aria-label="Open in tab"
+            >
+              <span className="hidden xl:inline">Open in tab</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('click');
+                onClose();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              title="Close calculator"
+              aria-label="Close calculator"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <a
-            href="https://www.desmos.com/testing/cb-digital-sat/graphing"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => soundEngine.play('click')}
-            className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Open calculator in new tab"
-            aria-label="Open in tab"
-          >
-            <span>Open in tab</span>
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.play('click');
-              onClose();
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Close calculator"
-            aria-label="Close calculator"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        {/* Embedded Desmos SAT Graphing Calculator */}
+        <div
+          className={`relative flex-1 overflow-hidden bg-white ${
+            isDocked ? '' : 'rounded-b-xl'
+          }`}
+        >
+          {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
+          {isInteracting && <div className="absolute inset-0 z-20 cursor-move" />}
+          <iframe
+            src="https://www.desmos.com/testing/cb-digital-sat/graphing"
+            title="Desmos SAT Graphing Calculator"
+            className="h-full w-full border-0"
+            allow="clipboard-write"
+          />
         </div>
       </div>
-
-      {/* Embedded Desmos SAT Graphing Calculator */}
-      <div className="relative flex-1 overflow-hidden rounded-b-xl bg-white">
-        {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
-        {isInteracting && <div className="absolute inset-0 z-20 cursor-move" />}
-        <iframe
-          src="https://www.desmos.com/testing/cb-digital-sat/graphing"
-          title="Desmos SAT Graphing Calculator"
-          className="h-full w-full border-0"
-          allow="clipboard-write"
-        />
-      </div>
-    </div>
+    </>
   );
 };
 

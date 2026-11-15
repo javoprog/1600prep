@@ -665,7 +665,10 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
       }
     }
 
-    // 8. Normalize standalone diagram <svg> elements (excluding KaTeX internal SVGs)
+    // 8. Normalize College Board tables (unwrap nested <figure class="table"> & layout wrappers)
+    normalizeTablesInDoc(doc);
+
+    // 9. Normalize standalone diagram <svg> elements (excluding KaTeX internal SVGs)
     const svgNodes = Array.from(doc.querySelectorAll('svg'));
     for (const svgEl of svgNodes) {
       if (svgEl.closest('.katex')) continue;
@@ -782,8 +785,19 @@ function extractInlineElementTex(el: Element): string | null {
 function isMathItalicElement(el: Element): boolean {
   const tag = el.tagName.toLowerCase();
   if (el.closest('.katex, pre, code')) return false;
-  if (tag === 'span') return el.classList.contains('italic');
-  if (tag !== 'em' && tag !== 'i') return false;
+  if (tag === 'span') {
+    if (el.classList.contains('italic')) return true;
+    if (
+      el.classList.contains('formatted_text') &&
+      el.className.includes('font_style:italic')
+    ) {
+      // Only treat formatted_text italic spans as math variables when matching math rules below
+    } else {
+      return false;
+    }
+  } else if (tag !== 'em' && tag !== 'i') {
+    return false;
+  }
   if (el.classList.contains('inline_variable')) return true;
 
   const rawText = (el.textContent || '').replace(/\u00A0/g, ' ').trim();
@@ -812,13 +826,106 @@ function isMathItalicElement(el: Element): boolean {
   return false;
 }
 
+function getDirectTableRows(tableEl: Element): Element[] {
+  const rows: Element[] = [];
+  for (const child of Array.from(tableEl.children)) {
+    const tag = child.tagName.toLowerCase();
+    if (tag === 'tr') {
+      rows.push(child);
+    } else if (tag === 'tbody' || tag === 'thead' || tag === 'tfoot') {
+      for (const inner of Array.from(child.children)) {
+        if (inner.tagName.toLowerCase() === 'tr') {
+          rows.push(inner);
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+function normalizeTablesInDoc(doc: Document): void {
+  // Iteratively unwrap single-cell outer layout <table> elements that only wrap another <table>
+  let unwrappedLayout = true;
+  while (unwrappedLayout) {
+    unwrappedLayout = false;
+    for (const tableEl of Array.from(doc.querySelectorAll('table'))) {
+      if (!tableEl.isConnected) continue;
+      const rows = getDirectTableRows(tableEl);
+      if (rows.length !== 1) continue;
+      const cells = Array.from(rows[0].children).filter((el) => {
+        const t = el.tagName.toLowerCase();
+        return t === 'td' || t === 'th';
+      });
+      if (cells.length !== 1) continue;
+      const meaningful = Array.from(cells[0].childNodes).filter(
+        (n) => n.nodeType !== Node.TEXT_NODE || (n.textContent || '').trim() !== ''
+      );
+      if (
+        meaningful.length === 1 &&
+        meaningful[0].nodeType === Node.ELEMENT_NODE &&
+        (meaningful[0] as Element).tagName.toLowerCase() === 'table'
+      ) {
+        tableEl.replaceWith(meaningful[0]);
+        unwrappedLayout = true;
+      }
+    }
+  }
+
+  // Collapse nested or redundant <figure class="table"> wrappers produced by CKEditor
+  let unwrappedFig = true;
+  while (unwrappedFig) {
+    unwrappedFig = false;
+    for (const figEl of Array.from(doc.querySelectorAll('figure.table'))) {
+      if (!figEl.isConnected) continue;
+      const hasOnlyTableOrFigure = Array.from(figEl.childNodes).every((n) => {
+        if (n.nodeType === Node.TEXT_NODE) return (n.textContent || '').trim() === '';
+        if (n.nodeType === Node.ELEMENT_NODE) {
+          const el = n as Element;
+          const tag = el.tagName.toLowerCase();
+          return (
+            tag === 'table' ||
+            (tag === 'figure' && el.classList.contains('table'))
+          );
+        }
+        return false;
+      });
+      if (hasOnlyTableOrFigure) {
+        figEl.replaceWith(...Array.from(figEl.childNodes));
+        unwrappedFig = true;
+      }
+    }
+  }
+
+  // Wrap every top-level non-borderless data table in a single .sat-table-wrap frame
+  for (const tableEl of Array.from(doc.querySelectorAll('table'))) {
+    if (!tableEl.isConnected) continue;
+    if (tableEl.classList.contains('table_Borderless')) continue;
+    // Skip tables nested inside another table or already wrapped
+    if (tableEl.parentElement?.closest('table, .sat-table-wrap')) continue;
+
+    // Reset cramped inline fixed widths (e.g. "width: 50px;" / "width: 100px;") & legacy attributes
+    if (tableEl instanceof HTMLElement) {
+      tableEl.style.removeProperty('width');
+    }
+    tableEl.removeAttribute('width');
+    tableEl.removeAttribute('border');
+    tableEl.removeAttribute('align');
+    tableEl.classList.add('sat-table-wrapped');
+
+    const wrap = doc.createElement('div');
+    wrap.className = 'sat-table-wrap';
+    tableEl.replaceWith(wrap);
+    wrap.appendChild(tableEl);
+  }
+}
+
 function promoteHtmlMathElements(doc: Document): void {
-  const candidates = Array.from(
-    doc.querySelectorAll('span.italic, em, i')
-  ).filter((el) => {
+  const selector =
+    'span.italic, span.formatted_text[class*="font_style:italic"], em, i';
+  const candidates = Array.from(doc.querySelectorAll(selector)).filter((el) => {
     // Skip elements nested inside an outer candidate or sup/sub (outer handles children)
     const p = el.parentElement;
-    return !p?.closest('span.italic, em, i, sup, sub');
+    return !p?.closest(`${selector}, sup, sub`);
   });
 
   for (const el of candidates) {

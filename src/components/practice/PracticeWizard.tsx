@@ -80,7 +80,14 @@ export const PracticeWizard: React.FC = () => {
   const { metas, taxonomy, startPracticeSession } = useApp();
 
   const [step, setStep] = useState<WizardStep>(1);
+  const [stepDirection, setStepDirection] = useState<'none' | 'forward' | 'backward'>('none');
   const [subject, setSubject] = useState<SubjectCode>('rw');
+
+  const navigateToStep = (target: WizardStep) => {
+    if (target === step) return;
+    setStepDirection(target > step ? 'forward' : 'backward');
+    setStep(target);
+  };
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
@@ -313,7 +320,7 @@ export const PracticeWizard: React.FC = () => {
                   onClick={() => {
                     if (s < step) {
                       soundEngine.play('click');
-                      setStep(s);
+                      navigateToStep(s);
                     }
                   }}
                   disabled={s > step}
@@ -351,7 +358,11 @@ export const PracticeWizard: React.FC = () => {
 
       {/* Step 1: Choose Subject */}
       {step === 1 && (
-        <div className="space-y-8">
+        <div
+          className={`space-y-8 ${
+            stepDirection === 'backward' ? 'animate-wizard-backward' : ''
+          }`}
+        >
           <div>
             <p className="text-xs font-medium text-white">Step 1</p>
             <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
@@ -450,7 +461,7 @@ export const PracticeWizard: React.FC = () => {
               size="lg"
               onClick={() => {
                 soundEngine.play('click');
-                setStep(2);
+                navigateToStep(2);
               }}
             >
               <span>Continue</span>
@@ -462,7 +473,7 @@ export const PracticeWizard: React.FC = () => {
 
       {/* Step 2: Choose Your Focus & Difficulty */}
       {step === 2 && (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-wizard-forward">
           <div>
             <p className="text-xs font-medium text-white">
               Step 2 • {subject === 'rw' ? 'Reading & Writing' : 'Math'}
@@ -645,13 +656,13 @@ export const PracticeWizard: React.FC = () => {
           )}
 
           {/* Direct Start Practice! Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#1F1F23] pt-6">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-4 border-t border-[#1F1F23] pt-6">
             <Button3D
               variant="ghost"
               size="md"
               onClick={() => {
                 soundEngine.play('click');
-                setStep(1);
+                navigateToStep(1);
               }}
             >
               <ArrowLeft className="h-4 w-4" />

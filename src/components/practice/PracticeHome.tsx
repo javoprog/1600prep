@@ -23,7 +23,10 @@ export const PracticeHome: React.FC = () => {
 
   if (isCatalogLoading && !taxonomy) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-28 sm:px-6 flex flex-col items-center justify-center text-center">
+      <div
+        key="catalog-loading"
+        className="mx-auto max-w-4xl px-4 py-28 sm:px-6 flex flex-col items-center justify-center text-center animate-page-in"
+      >
         <Loader2 className="h-6 w-6 animate-spin text-[#69ff00]" />
         <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
           Loading SAT Question Bank
@@ -38,7 +41,10 @@ export const PracticeHome: React.FC = () => {
 
   if (catalogError && !taxonomy) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-24 sm:px-6">
+      <div
+        key="catalog-error"
+        className="mx-auto max-w-lg px-4 py-24 sm:px-6 animate-page-in"
+      >
         <div className="rounded-2xl border border-[#4C2024] bg-[#111113] p-8 text-center">
           <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
           <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
@@ -59,7 +65,10 @@ export const PracticeHome: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <div
+      key="catalog-ready"
+      className="mx-auto max-w-4xl px-4 py-10 sm:px-6 animate-page-in"
+    >
       {/* Offline Warning Banner */}
       {isOfflineFallback && offlineWarning && (
         <div className="mb-8 mx-auto max-w-3xl flex items-center justify-between gap-4 rounded-xl border border-[#29292E] bg-[#111113] px-4 py-3 text-xs text-[#F5F5F5]">
