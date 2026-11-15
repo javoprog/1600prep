@@ -10,6 +10,7 @@ import {
   Calculator,
   Check,
   CheckCircle2,
+  Clock,
   Eye,
   EyeOff,
   Loader2,
@@ -1034,94 +1035,86 @@ export const QuestionSolver: React.FC = () => {
               {currentQuestionState.isSubmitted && (
                 <div
                   aria-live="polite"
-                  className={`overflow-hidden rounded-2xl border bg-[#111113] ${
+                  className={`overflow-hidden rounded-2xl border border-[#29292E] bg-[#111113] ${
                     currentQuestionState.isCorrect
-                      ? 'animate-feedback-correct border-emerald-500/30'
-                      : 'animate-feedback-incorrect border-red-500/30'
+                      ? 'animate-feedback-correct'
+                      : 'animate-feedback-incorrect'
                   }`}
                 >
-                  {/* Structured Status Header Band */}
-                  <div
-                    className={`border-b border-[#1F1F23] px-5 py-4 sm:px-6 ${
-                      currentQuestionState.isCorrect
-                        ? 'bg-emerald-500/[0.06]'
-                        : 'bg-red-500/[0.06]'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                  {/* Structured Status & Answer Comparison Header */}
+                  <div className="border-b border-[#1F1F23] bg-[#141417] px-5 py-4 sm:px-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
                             currentQuestionState.isCorrect
                               ? 'bg-emerald-500/15 text-emerald-400'
                               : 'bg-red-500/15 text-red-400'
                           }`}
                         >
                           {currentQuestionState.isCorrect ? (
-                            <CheckCircle2 className="h-4.5 w-4.5" />
+                            <CheckCircle2 className="h-4 w-4" />
                           ) : (
-                            <XCircle className="h-4.5 w-4.5" />
+                            <XCircle className="h-4 w-4" />
                           )}
                         </div>
-                        <div>
-                          <div
-                            className={`text-sm font-semibold ${
-                              currentQuestionState.isCorrect
-                                ? 'text-emerald-300'
-                                : 'text-red-300'
-                            }`}
-                          >
-                            {currentQuestionState.isCorrect
-                              ? 'Correct'
-                              : 'Incorrect'}
-                          </div>
-                          <div className="text-xs text-[#A1A1AA]">
-                            {currentQuestionState.isCorrect
-                              ? 'Well done — review the walkthrough below if needed.'
-                              : 'Review the solution steps below to see why.'}
-                          </div>
-                        </div>
+                        <span
+                          className={`text-sm font-semibold ${
+                            currentQuestionState.isCorrect
+                              ? 'text-emerald-400'
+                              : 'text-red-400'
+                          }`}
+                        >
+                          {currentQuestionState.isCorrect
+                            ? 'Correct'
+                            : 'Incorrect'}
+                        </span>
                       </div>
 
-                      <span className="shrink-0 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3 py-1 text-xs font-medium tabular-nums text-[#A1A1AA]">
-                        {formatShortDuration(currentQuestionState.timeSpent)}
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3 py-1 text-xs font-medium tabular-nums text-[#A1A1AA]">
+                        <Clock className="h-3 w-3 text-[#71717A]" />
+                        <span>
+                          {formatShortDuration(currentQuestionState.timeSpent)}
+                        </span>
                       </span>
                     </div>
 
-                    {/* Your Answer vs Correct Answer Comparison Strip */}
-                    <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3.5 py-1.5 text-xs">
-                        <span className="text-[#A1A1AA]">Your answer</span>
-                        <span
-                          className={`font-mono font-semibold ${
-                            currentQuestionState.isCorrect
-                              ? 'text-emerald-300'
-                              : 'text-red-300'
-                          }`}
-                        >
-                          {currentQuestionState.submittedAnswer}
-                        </span>
-                      </div>
+                    {/* Cohesive Answer Comparison Strip */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {currentQuestionState.isCorrect ? (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3.5 py-1.5 text-xs">
+                          <span className="text-[#71717A]">Answer</span>
+                          <span className="font-mono font-semibold text-emerald-400">
+                            {currentQuestionState.submittedAnswer}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3.5 py-1.5 text-xs">
+                            <span className="text-[#71717A]">Your answer</span>
+                            <span className="font-mono font-semibold text-red-400">
+                              {currentQuestionState.submittedAnswer}
+                            </span>
+                          </div>
 
-                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-3.5 py-1.5 text-xs">
-                        <span className="text-[#A1A1AA]">Correct answer</span>
-                        <span className="font-mono font-semibold text-emerald-300">
-                          {question.correctAnswer.length > 0
-                            ? question.correctAnswer.join(' or ')
-                            : 'See explanation'}
-                        </span>
-                      </div>
+                          <div className="inline-flex items-center gap-2 rounded-full border border-[#3F3F46] bg-[#18181B] px-3.5 py-1.5 text-xs">
+                            <span className="text-[#A1A1AA]">Correct answer</span>
+                            <span className="font-mono font-semibold text-[#F5F5F5]">
+                              {question.correctAnswer.length > 0
+                                ? question.correctAnswer.join(' or ')
+                                : 'See explanation'}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Explanation Body */}
                   <div className="p-5 sm:p-6">
-                    <div className="mb-3.5 flex items-center gap-2.5">
-                      <span
-                        className="h-4 w-1 rounded-full bg-[#69ff00]"
-                        aria-hidden="true"
-                      />
-                      <h3 className="text-sm font-semibold text-white">
+                    <div className="mb-3 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-[#71717A]" />
+                      <h3 className="text-sm font-semibold text-[#F5F5F5]">
                         Explanation
                       </h3>
                     </div>
