@@ -45,6 +45,11 @@ export const SessionSummary: React.FC = () => {
     return st?.isSubmitted && !st.isCorrect;
   });
 
+  const maxVisitedIdx = Math.max(
+    activeSession.currentIndex,
+    activeSession.maxVisitedIndex ?? 0
+  );
+
   const displayedQuestionEntries = activeSession.questionIds
     .map((qId, idx) => ({
       qId,
@@ -53,7 +58,8 @@ export const SessionSummary: React.FC = () => {
     }))
     .filter(
       ({ idx, st }) =>
-        idx <= activeSession.currentIndex ||
+        idx <= maxVisitedIdx ||
+        Boolean(st?.visited) ||
         Boolean(st?.isSubmitted) ||
         Boolean(st?.draftAnswer)
     );

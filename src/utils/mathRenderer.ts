@@ -467,16 +467,67 @@ function namespaceSvgIds(svgEl: SVGElement): void {
   });
 }
 
+const RENDER_CACHE = new Map<string, string>();
+const MAX_RENDER_CACHE_SIZE = 300;
+const BLOCKED_HTML_TAGS =
+  'script, iframe, frame, frameset, object, embed, applet, base, meta, link, form';
+const URI_ATTRS = ['href', 'src', 'xlink:href', 'action', 'formaction'] as const;
+
+function isSafeUriValue(rawValue: string): boolean {
+  const normalized = rawValue.replace(/[\u0000-\u0020]+/g, '').toLowerCase();
+  if (!normalized) return true;
+  if (
+    normalized.startsWith('javascript:') ||
+    normalized.startsWith('vbscript:')
+  ) {
+    return false;
+  }
+  if (normalized.startsWith('data:')) {
+    return normalized.startsWith('data:image/');
+  }
+  return true;
+}
+
+function sanitizeParsedDocument(doc: Document): void {
+  for (const dangerousEl of Array.from(doc.querySelectorAll(BLOCKED_HTML_TAGS))) {
+    dangerousEl.remove();
+  }
+  for (const el of Array.from(doc.querySelectorAll('*'))) {
+    for (const attr of Array.from(el.attributes)) {
+      const attrName = attr.name.toLowerCase();
+      if (attrName.startsWith('on')) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      if (
+        (URI_ATTRS as readonly string[]).includes(attrName) &&
+        !isSafeUriValue(attr.value)
+      ) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+}
+
 export function renderRichHtmlWithKatex(rawHtml?: string): string {
   if (!rawHtml) return '';
   if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
     return rawHtml;
   }
 
+  const cached = RENDER_CACHE.get(rawHtml);
+  if (cached !== undefined) {
+    // Refresh recency in LRU cache
+    RENDER_CACHE.delete(rawHtml);
+    RENDER_CACHE.set(rawHtml, cached);
+    return cached;
+  }
+
   // Strip Word clipboard comments that fragment inline math text nodes
   // Expand any self-closing MathML tags before HTML5 DOMParser runs
   let preProcessed = rawHtml
     .replace(/<!--\s*(?:Start|End)Fragment\s*-->/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(
       /<(mspace|none|mprescripts|mi|mn|mo|mtext|ms)\b([^>]*?)\/>/gi,
       '<$1$2></$1>'
@@ -515,6 +566,7 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(preProcessed, 'text/html');
+    sanitizeParsedDocument(doc);
 
     // 1. Convert all <math> elements in the DOM into KaTeX HTML
     const mathNodes = Array.from(doc.querySelectorAll('math'));
@@ -708,9 +760,18 @@ export function renderRichHtmlWithKatex(rawHtml?: string): string {
       }
     }
 
-    return doc.body.innerHTML;
+    sanitizeParsedDocument(doc);
+    const result = doc.body.innerHTML;
+    if (RENDER_CACHE.size >= MAX_RENDER_CACHE_SIZE) {
+      const oldestKey = RENDER_CACHE.keys().next().value;
+      if (oldestKey !== undefined) {
+        RENDER_CACHE.delete(oldestKey);
+      }
+    }
+    RENDER_CACHE.set(rawHtml, result);
+    return result;
   } catch {
-    return preProcessed;
+    return preProcessed.replace(/\son[a-z]+\s*=\s*(['"])[\s\S]*?\1/gi, '');
   }
 }
 

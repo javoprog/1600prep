@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import {
   Attempt,
-  Bookmark,
   PracticeFilters,
   PracticeMode,
   Question,
@@ -21,7 +20,11 @@ import {
   TaxonomyData,
   UserSettings,
 } from '@/types';
-import { DEFAULT_USER_SETTINGS } from '@/services/storage/preferences';
+import {
+  DEFAULT_USER_SETTINGS,
+  loadUserSettings,
+  saveUserSettings,
+} from '@/services/storage/preferences';
 import {
   evaluateAnswer,
   initializeCatalog,
@@ -39,25 +42,11 @@ interface AppContextValue {
   catalogError: string | null;
   isOfflineFallback: boolean;
   offlineWarning: string | null;
-  reloadCatalog: () => Promise<void>;
+  reloadCatalog: (forceRefresh?: boolean) => Promise<void>;
 
-  // Anonymous in-memory state (no user data persisted)
+  // User Preferences (stored locally on device)
   settings: UserSettings;
   updateSettings: (partial: Partial<UserSettings>) => void;
-  bookmarks: Bookmark[];
-  bookmarkedIds: Set<string>;
-  toggleBookmark: (
-    questionId: string,
-    meta?: Partial<QuestionMeta>
-  ) => Promise<void>;
-  attempts: Attempt[];
-  sessions: Session[];
-  refreshProgress: () => Promise<void>;
-  clearProgress: () => Promise<void>;
-
-  // Settings Modal (unused, kept for interface compatibility)
-  isSettingsOpen: boolean;
-  setIsSettingsOpen: (open: boolean) => void;
 
   // Active Session & Stopwatch
   activeSession: Session | null;
@@ -69,10 +58,6 @@ interface AppContextValue {
     title: string,
     explicitQuestionIds?: string[]
   ) => Promise<Session>;
-  openExistingSession: (
-    sessionId: string,
-    openInSummary?: boolean
-  ) => Promise<void>;
   closeActiveSession: () => void;
   togglePauseSession: () => void;
   setDraftAnswer: (questionId: string, draft: string) => void;
@@ -105,10 +90,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isOfflineFallback, setIsOfflineFallback] = useState<boolean>(false);
   const [offlineWarning, setOfflineWarning] = useState<string | null>(null);
 
-  // Purely in-memory settings (no user data persisted)
+  // Hydrate user preferences after mount to prevent SSR/client hydration mismatch
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [isSessionSummaryView, setIsSessionSummaryView] =
@@ -120,33 +104,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     activeSessionRef.current = activeSession;
   }, [activeSession]);
 
+  useEffect(() => {
+    const saved = loadUserSettings();
+    settingsRef.current = saved;
+    soundEngine.setSettings(saved);
+    setSettings(saved);
+  }, []);
+
   const metaMap = useMemo(() => {
     return new Map(metas.map((m) => [m.id, m]));
   }, [metas]);
 
-  const bookmarks = useMemo<Bookmark[]>(() => [], []);
-  const bookmarkedIds = useMemo<Set<string>>(() => new Set(), []);
-  const attempts = useMemo<Attempt[]>(() => [], []);
-  const sessions = useMemo<Session[]>(() => [], []);
-
-  const refreshProgress = useCallback(async () => {
-    // No-op: anonymous mode does not collect or persist user progress
-  }, []);
-
-  const clearProgress = useCallback(async () => {
-    setActiveSession(null);
-    setIsSessionSummaryView(false);
-  }, []);
-
-  const toggleBookmark = useCallback(async () => {
-    // No-op: bookmarks removed in anonymous mode
-  }, []);
-
-  const reloadCatalog = useCallback(async () => {
+  const reloadCatalog = useCallback(async (forceRefresh = false) => {
     setIsCatalogLoading(true);
     setCatalogError(null);
     try {
-      const res = await initializeCatalog(false);
+      const res = await initializeCatalog(forceRefresh);
       setTaxonomy(res.taxonomy);
       setMetas(res.metas);
       setIsOfflineFallback(res.isOfflineFallback);
@@ -162,9 +135,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // Initial boot: load catalog only (anonymous mode, no saved sessions or user data)
+  // Initial boot: load catalog (session history remains anonymous in memory)
   useEffect(() => {
-    reloadCatalog();
+    reloadCatalog(false);
   }, [reloadCatalog]);
 
   useEffect(() => {
@@ -176,6 +149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const next = { ...settingsRef.current, ...partial };
     settingsRef.current = next;
     soundEngine.setSettings(next);
+    saveUserSettings(next);
     setSettings(next);
   }, []);
 
@@ -202,14 +176,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const questionStates: Record<string, SessionQuestionState> = {};
-      for (const qId of questionIds) {
+      questionIds.forEach((qId, idx) => {
         questionStates[qId] = {
           questionId: qId,
           draftAnswer: '',
           isSubmitted: false,
           timeSpent: 0,
+          visited: idx === 0,
         };
-      }
+      });
 
       const newSession: Session = {
         id: generateId(),
@@ -222,6 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         },
         questionIds,
         currentIndex: 0,
+        maxVisitedIndex: 0,
         questionStates,
         startedAt: Date.now(),
         totalTime: 0,
@@ -283,10 +259,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       [resolvedId, ...relatedIds]
     ).catch(() => {});
   }, [metas, startPracticeSession]);
-
-  const openExistingSession = useCallback(async () => {
-    // No-op in anonymous mode
-  }, []);
 
   const closeActiveSession = useCallback(() => {
     setActiveSession(null);
@@ -389,12 +361,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const clamped = Math.max(0, Math.min(prev.questionIds.length - 1, index));
       if (clamped === prev.currentIndex) return prev;
 
+      const targetQId = prev.questionIds[clamped];
+      const nextStates =
+        targetQId && prev.questionStates[targetQId]
+          ? {
+              ...prev.questionStates,
+              [targetQId]: {
+                ...prev.questionStates[targetQId],
+                visited: true,
+              },
+            }
+          : prev.questionStates;
+
       // Prefetch upcoming questions
       prefetchQuestions(prev.questionIds.slice(clamped, clamped + 4));
 
       return {
         ...prev,
         currentIndex: clamped,
+        maxVisitedIndex: Math.max(prev.maxVisitedIndex ?? prev.currentIndex, clamped),
+        questionStates: nextStates,
       };
     });
   }, []);
@@ -454,20 +440,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
-      bookmarks,
-      bookmarkedIds,
-      toggleBookmark,
-      attempts,
-      sessions,
-      refreshProgress,
-      clearProgress,
-      isSettingsOpen,
-      setIsSettingsOpen,
       activeSession,
       isSessionSummaryView,
       setIsSessionSummaryView,
       startPracticeSession,
-      openExistingSession,
       closeActiveSession,
       togglePauseSession,
       setDraftAnswer,
@@ -487,18 +463,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
-      bookmarks,
-      bookmarkedIds,
-      toggleBookmark,
-      attempts,
-      sessions,
-      refreshProgress,
-      clearProgress,
-      isSettingsOpen,
       activeSession,
       isSessionSummaryView,
       startPracticeSession,
-      openExistingSession,
       closeActiveSession,
       togglePauseSession,
       setDraftAnswer,

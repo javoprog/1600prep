@@ -1,6 +1,4 @@
 import {
-  Attempt,
-  Bookmark,
   PracticeFilters,
   Question,
   QuestionMeta,
@@ -8,10 +6,8 @@ import {
   TaxonomyData,
 } from '@/types';
 import {
-  getAllAttempts,
   getAllCachedQuestions,
   getAllQuestionMetas,
-  getBookmarks,
   getCachedQuestion,
   getCachedTaxonomy,
   getQuestionMetaById,
@@ -22,6 +18,7 @@ import {
 import {
   buildTaxonomyFromLookupAndMetas,
   evaluateAnswer,
+  isValidCompleteSprFormat,
   normalizeDigitalQuestion,
   normalizeDisclosedQuestion,
   normalizeQuestionMetaList,
@@ -31,17 +28,45 @@ import {
   RawQuestionListItem,
 } from './normalizer';
 
-export { evaluateAnswer };
+export { evaluateAnswer, isValidCompleteSprFormat };
 
 const QBANK_BASE = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod';
 const SAIC_BASE = 'https://saic.collegeboard.org/disclosed';
 const REQUEST_TIMEOUT_MS = 12000;
+const CATALOG_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 2;
 
 // In-memory cache & deduplication
 let memoryTaxonomy: TaxonomyData | null = null;
 let memoryMetas: Map<string, QuestionMeta> = new Map();
+let memoryIsOfflineFallback = false;
 const inFlightRequests = new Map<string, Promise<unknown>>();
+
+class NonRetryableHttpError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableHttpError';
+  }
+}
+
+function isNonRetryableStatus(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+function buildProxyGetUrl(
+  action: string,
+  payload?: Record<string, unknown>
+): string {
+  const params = new URLSearchParams({ action });
+  if (payload) {
+    for (const [key, val] of Object.entries(payload)) {
+      if (val !== undefined && val !== null) {
+        params.set(key, String(val));
+      }
+    }
+  }
+  return `/api/qbank?${params.toString()}`;
+}
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -82,24 +107,41 @@ async function requestQBank<T>(
       try {
         const res = await directRequest();
         if (!res.ok) {
-          throw new Error(`College Board API returned HTTP ${res.status}`);
+          const msg = `College Board API returned HTTP ${res.status}`;
+          if (isNonRetryableStatus(res.status)) {
+            throw new NonRetryableHttpError(msg);
+          }
+          throw new Error(msg);
         }
         const data = (await res.json()) as T;
         return data;
       } catch (err) {
+        if (err instanceof NonRetryableHttpError) {
+          throw err;
+        }
         lastError = err instanceof Error ? err : new Error(String(err));
-        // Try server-side proxy fallback before retrying
+        // Try cacheable GET server-side proxy fallback before retrying
         try {
-          const proxyRes = await fetchWithTimeout('/api/qbank', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: proxyAction, payload: proxyPayload }),
-          });
+          const proxyRes = await fetchWithTimeout(
+            buildProxyGetUrl(proxyAction, proxyPayload),
+            {
+              method: 'GET',
+              headers: { Accept: 'application/json' },
+            }
+          );
           if (proxyRes.ok) {
             return (await proxyRes.json()) as T;
           }
-        } catch {
-          // Ignore proxy error and continue retry loop
+          if (isNonRetryableStatus(proxyRes.status)) {
+            throw new NonRetryableHttpError(
+              `Proxy returned HTTP ${proxyRes.status}`
+            );
+          }
+        } catch (proxyErr) {
+          if (proxyErr instanceof NonRetryableHttpError) {
+            throw proxyErr;
+          }
+          // Ignore transient proxy error and continue retry loop
         }
 
         if (attempt < MAX_RETRIES) {
@@ -127,23 +169,32 @@ export interface CatalogInitResult {
 }
 
 export async function initializeCatalog(forceRefresh = false): Promise<CatalogInitResult> {
-  if (!forceRefresh && memoryTaxonomy && memoryMetas.size > 0) {
-    return {
-      taxonomy: memoryTaxonomy,
-      metas: Array.from(memoryMetas.values()),
-      isOfflineFallback: false,
-    };
+  if (!forceRefresh && !memoryIsOfflineFallback && memoryTaxonomy && memoryMetas.size > 0) {
+    const isFreshMemory =
+      Date.now() - memoryTaxonomy.fetchedAt < CATALOG_CACHE_TTL_MS;
+    if (isFreshMemory) {
+      return {
+        taxonomy: memoryTaxonomy,
+        metas: Array.from(memoryMetas.values()),
+        isOfflineFallback: false,
+      };
+    }
   }
 
-  // 1. Check IndexedDB cache first for fast startup
+  // 1. Check IndexedDB cache first for fast startup when within TTL
   if (!forceRefresh) {
     const [cachedTax, cachedMetas] = await Promise.all([
       getCachedTaxonomy(),
       getAllQuestionMetas(),
     ]);
-    if (cachedTax && cachedMetas.length > 0) {
+    if (
+      cachedTax &&
+      cachedMetas.length > 0 &&
+      Date.now() - cachedTax.fetchedAt < CATALOG_CACHE_TTL_MS
+    ) {
       memoryTaxonomy = cachedTax;
       memoryMetas = new Map(cachedMetas.map((m) => [m.id, m]));
+      memoryIsOfflineFallback = false;
       return {
         taxonomy: cachedTax,
         metas: cachedMetas,
@@ -215,6 +266,7 @@ export async function initializeCatalog(forceRefresh = false): Promise<CatalogIn
 
     memoryTaxonomy = taxonomy;
     memoryMetas = new Map(allMetas.map((m) => [m.id, m]));
+    memoryIsOfflineFallback = false;
 
     // Persist asynchronously to IndexedDB
     Promise.all([setCachedTaxonomy(taxonomy), saveQuestionMetas(allMetas)]).catch((err) =>
@@ -243,6 +295,7 @@ export async function initializeCatalog(forceRefresh = false): Promise<CatalogIn
 
       memoryTaxonomy = taxonomy;
       memoryMetas = new Map(fallbackMetas.map((m) => [m.id, m]));
+      memoryIsOfflineFallback = true;
 
       return {
         taxonomy,
@@ -330,16 +383,7 @@ export function prefetchQuestions(questionIds: string[]): void {
   }
 }
 
-// --- Question Pool Filtering & Repetition Engine ---
-
-export interface PoolCounts {
-  totalMatching: number;
-  newCount: number;
-  previousCount: number;
-  incorrectCount: number;
-  bookmarkedCount: number;
-  effectiveAvailable: number;
-}
+// --- Question Pool Filtering ---
 
 function matchesBaseFilters(meta: QuestionMeta, filters: PracticeFilters): boolean {
   if (meta.subject !== filters.subject) return false;
@@ -372,96 +416,6 @@ function matchesBaseFilters(meta: QuestionMeta, filters: PracticeFilters): boole
   }
 
   return true;
-}
-
-function buildAttemptMaps(attempts: Attempt[], bookmarks: Bookmark[]) {
-  const attemptsByQuestion = new Map<string, Attempt[]>();
-  // attempts is already sorted newest first by getAllAttempts()
-  for (const att of attempts) {
-    const list = attemptsByQuestion.get(att.questionId);
-    if (list) {
-      list.push(att);
-    } else {
-      attemptsByQuestion.set(att.questionId, [att]);
-    }
-  }
-
-  const bookmarkedIds = new Set(bookmarks.map((b) => b.questionId));
-  return { attemptsByQuestion, bookmarkedIds };
-}
-
-export async function getPoolBreakdown(
-  metas: QuestionMeta[],
-  filters: PracticeFilters
-): Promise<{
-  basePool: QuestionMeta[];
-  newPool: QuestionMeta[];
-  previousPool: QuestionMeta[];
-  incorrectPool: QuestionMeta[];
-  bookmarkedPool: QuestionMeta[];
-  counts: PoolCounts;
-}> {
-  const [attempts, bookmarks] = await Promise.all([getAllAttempts(), getBookmarks()]);
-  const { attemptsByQuestion, bookmarkedIds } = buildAttemptMaps(attempts, bookmarks);
-
-  const basePool = metas.filter((m) => matchesBaseFilters(m, filters));
-  const newPool: QuestionMeta[] = [];
-  const previousPool: QuestionMeta[] = [];
-  const incorrectPool: QuestionMeta[] = [];
-  const bookmarkedPool: QuestionMeta[] = [];
-
-  for (const m of basePool) {
-    const qAttempts = attemptsByQuestion.get(m.id);
-    if (!qAttempts || qAttempts.length === 0) {
-      newPool.push(m);
-    } else {
-      previousPool.push(m);
-      // Include in incorrectPool if most recent attempt was incorrect (or any attempt was incorrect)
-      const latest = qAttempts[0];
-      if (!latest.isCorrect) {
-        incorrectPool.push(m);
-      }
-    }
-
-    if (bookmarkedIds.has(m.id)) {
-      bookmarkedPool.push(m);
-    }
-  }
-
-  let effectiveAvailable = basePool.length;
-  switch (filters.repetitionFilter) {
-    case 'new':
-      effectiveAvailable = newPool.length;
-      break;
-    case 'previous':
-      effectiveAvailable = previousPool.length;
-      break;
-    case 'incorrect':
-      effectiveAvailable = incorrectPool.length;
-      break;
-    case 'bookmarked':
-      effectiveAvailable = bookmarkedPool.length;
-      break;
-    case 'all':
-      effectiveAvailable = basePool.length;
-      break;
-  }
-
-  return {
-    basePool,
-    newPool,
-    previousPool,
-    incorrectPool,
-    bookmarkedPool,
-    counts: {
-      totalMatching: basePool.length,
-      newCount: newPool.length,
-      previousCount: previousPool.length,
-      incorrectCount: incorrectPool.length,
-      bookmarkedCount: bookmarkedPool.length,
-      effectiveAvailable,
-    },
-  };
 }
 
 function shuffleArray<T>(items: T[]): T[] {

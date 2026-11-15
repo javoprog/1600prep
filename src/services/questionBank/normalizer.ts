@@ -393,6 +393,11 @@ function parseSpokenFraction(text: string): string[] {
   return [];
 }
 
+function stripThousandsCommas(text: string): string {
+  // Remove thousands separators inside numbers like "1,250" or "12,500" while keeping lists like "7, 8, or 13" intact
+  return text.replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
+}
+
 export function extractDisclosedSprAnswers(rationaleHtml?: string): string[] {
   if (!rationaleHtml) return [];
   const results = new Set<string>();
@@ -410,7 +415,7 @@ export function extractDisclosedSprAnswers(rationaleHtml?: string): string[] {
     /Note that\s+(.+?)\s+(?:are|is)\s+examples?\s+of\s+ways?\s+to\s+enter/i
   );
   if (noteMatch && noteMatch[1]) {
-    const tokens = noteMatch[1].match(/-?\d+(?:\/\d+|\.\d+)?/g);
+    const tokens = stripThousandsCommas(noteMatch[1]).match(/-?\d+(?:\/\d+|\.\d+)?/g);
     if (tokens) {
       tokens.forEach((t) => results.add(t));
     }
@@ -428,15 +433,15 @@ export function extractDisclosedSprAnswers(rationaleHtml?: string): string[] {
         const inner = bm.slice(1, -1);
         const parsedFracs = parseSpokenFraction(inner);
         parsedFracs.forEach((f) => results.add(f));
-        const numTokens = inner.match(/-?\d+(?:\/\d+|\.\d+)?/g);
+        const numTokens = stripThousandsCommas(inner).match(/-?\d+(?:\/\d+|\.\d+)?/g);
         if (numTokens && parsedFracs.length === 0) {
           numTokens.forEach((t) => results.add(t));
         }
       }
     }
 
-    // Check plain numbers in "The correct answer is 2.6" or "either 7, 8, or 13"
-    const withoutBrackets = rawAns.replace(/\[[^\]]+\]/g, '');
+    // Check plain numbers in "The correct answer is 2.6", "1,250", or "either 7, 8, or 13"
+    const withoutBrackets = stripThousandsCommas(rawAns.replace(/\[[^\]]+\]/g, ''));
     const nums = withoutBrackets.match(/-?\d+(?:\/\d+|\.\d+)?/g);
     if (nums) {
       nums.forEach((n) => results.add(n));
@@ -498,8 +503,17 @@ export function normalizeDisclosedQuestion(
 
 // --- SPR Numerical Equivalence Evaluator ---
 
-export function parseNumericValue(input: string): number | null {
+export function isValidCompleteSprFormat(input: string): boolean {
   const cleaned = input.trim().replace(/\s+/g, '');
+  if (!cleaned) return false;
+  if (!/^-?(?:\d+(?:\.\d+)?|\.\d+|\d+\/\d+)$/.test(cleaned)) {
+    return false;
+  }
+  return parseNumericValue(cleaned) !== null;
+}
+
+export function parseNumericValue(input: string): number | null {
+  const cleaned = stripThousandsCommas(input.trim().replace(/\s+/g, ''));
   if (!cleaned) return null;
 
   // Fraction: e.g. 3/2, -3/4

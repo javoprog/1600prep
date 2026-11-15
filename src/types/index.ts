@@ -16,7 +16,6 @@ export type NewPreviousRatio = 100 | 75 | 50 | 25 | 0;
 
 export type PracticeMode =
   | 'custom'
-  | 'bookmarks'
   | 'mistakes'
   | 'retry';
 
@@ -111,6 +110,7 @@ export interface SessionQuestionState {
   isCorrect?: boolean;
   attemptId?: string;
   timeSpent: number; // milliseconds accumulated on this question in this session
+  visited?: boolean;
 }
 
 export interface Session {
@@ -121,6 +121,7 @@ export interface Session {
   filters: PracticeFilters;
   questionIds: string[];
   currentIndex: number;
+  maxVisitedIndex?: number;
   questionStates: Record<string, SessionQuestionState>;
   startedAt: number;
   completedAt?: number;

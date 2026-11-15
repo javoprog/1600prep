@@ -272,18 +272,6 @@ body {
   }
 }
 
-@keyframes bookmarkPop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.16);
-  }
-  100% {
-    transform: none;
-  }
-}
-
 .animate-page-in {
   animation: pageEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -310,10 +298,6 @@ body {
 
 .animate-feedback-incorrect {
   animation: feedbackIncorrectIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.animate-bookmark-pop {
-  animation: bookmarkPop 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .animate-completion {

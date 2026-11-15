@@ -1,7 +1,6 @@
 import { DifficultyCode, UserSettings } from '@/types';
 
 const SETTINGS_KEY = '1600prep_settings_v1';
-const ACTIVE_SESSION_KEY = '1600prep_active_session_v1';
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   soundEnabled: true,
@@ -9,8 +8,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultDifficulties: ['E', 'M', 'H'],
   defaultDifficulty: 'ALL',
   defaultQuestionCount: 10,
-  defaultRepetitionFilter: 'all',
-  defaultNewRatio: 100,
 };
 
 export function loadUserSettings(): UserSettings {
@@ -55,13 +52,6 @@ export function loadUserSettings(): UserSettings {
         typeof parsed.defaultQuestionCount === 'number'
           ? parsed.defaultQuestionCount
           : DEFAULT_USER_SETTINGS.defaultQuestionCount,
-      defaultRepetitionFilter:
-        parsed.defaultRepetitionFilter ||
-        DEFAULT_USER_SETTINGS.defaultRepetitionFilter,
-      defaultNewRatio:
-        typeof parsed.defaultNewRatio === 'number'
-          ? parsed.defaultNewRatio
-          : DEFAULT_USER_SETTINGS.defaultNewRatio,
     };
   } catch {
     return DEFAULT_USER_SETTINGS;
@@ -74,27 +64,5 @@ export function saveUserSettings(settings: UserSettings): void {
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch (err) {
     console.warn('Failed to save settings to localStorage:', err);
-  }
-}
-
-export function getActiveSessionId(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(ACTIVE_SESSION_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setActiveSessionId(sessionId: string | null): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (sessionId) {
-      window.localStorage.setItem(ACTIVE_SESSION_KEY, sessionId);
-    } else {
-      window.localStorage.removeItem(ACTIVE_SESSION_KEY);
-    }
-  } catch (err) {
-    console.warn('Failed to set active session id:', err);
   }
 }

@@ -21,7 +21,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { fetchQuestionDetail } from '@/services/questionBank';
+import {
+  fetchQuestionDetail,
+  isValidCompleteSprFormat,
+} from '@/services/questionBank';
 import { Question } from '@/types';
 import { RichMathContent } from '@/components/question/RichMathContent';
 import { BrandLogo } from '@/components/ui/BrandLogo';
@@ -75,12 +78,21 @@ export const QuestionSolver: React.FC = () => {
   const [isTimerHidden, setIsTimerHidden] = useState<boolean>(false);
   const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
   const footerRef = useRef<HTMLElement | null>(null);
+  const loadRequestIdRef = useRef<number>(0);
+  const questionStatesRef = useRef(activeSession?.questionStates);
+  questionStatesRef.current = activeSession?.questionStates;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const syncViewport = () => {
       const vw = window.innerWidth;
-      setIsDesktopSmUp(vw >= 640);
+      const isSmUp = vw >= 640;
+      setIsDesktopSmUp(isSmUp);
+      if (!isSmUp) {
+        setIsCalculatorOpen(false);
+        setIsReferenceOpen(false);
+        setIsScratchpadOpen(false);
+      }
       setCalculatorDockWidth((prev) => {
         const preferred = Math.min(580, Math.max(360, Math.round(vw * 0.45)));
         const maxAllowed = Math.max(360, Math.round(vw * 0.58));
@@ -122,29 +134,36 @@ export const QuestionSolver: React.FC = () => {
 
   const isCompletedSession = Boolean(activeSession?.completedAt);
 
-  // Load current question details
+  // Load current question details with stale-response guard for fast navigation
   const loadQuestion = useCallback(async (qId: string) => {
+    const reqId = ++loadRequestIdRef.current;
     setIsLoadingQuestion(true);
     setQuestionError(null);
     try {
       const q = await fetchQuestionDetail(qId);
+      if (loadRequestIdRef.current !== reqId) return;
       setQuestion(q);
     } catch (err) {
+      if (loadRequestIdRef.current !== reqId) return;
       setQuestionError(
         err instanceof Error
           ? err.message
           : 'Failed to load question content from the Question Bank.'
       );
     } finally {
-      setIsLoadingQuestion(false);
+      if (loadRequestIdRef.current === reqId) {
+        setIsLoadingQuestion(false);
+      }
     }
   }, []);
 
-  // Reset per-question timer and share state whenever the question changes
+  // Sync per-question stopwatch with accumulated question time when switching questions
   useEffect(() => {
     if (currentQuestionId) {
+      const storedTime =
+        questionStatesRef.current?.[currentQuestionId]?.timeSpent ?? 0;
       setIsShareCopied(false);
-      setQuestionTimerMs(0);
+      setQuestionTimerMs(storedTime);
       lastTickRef.current = Date.now();
       loadQuestion(currentQuestionId);
     }
@@ -221,17 +240,24 @@ export const QuestionSolver: React.FC = () => {
     [currentQuestionId, currentQuestionState, eliminatedMap, setDraftAnswer]
   );
 
+  const canSubmitAnswer = useMemo(() => {
+    if (!question || !currentQuestionState || currentQuestionState.isSubmitted) {
+      return false;
+    }
+    const draft = currentQuestionState.draftAnswer.trim();
+    if (!draft) return false;
+    if (question.questionType === 'spr') {
+      return isValidCompleteSprFormat(draft);
+    }
+    return true;
+  }, [question, currentQuestionState]);
+
   const handleSubmit = useCallback(async () => {
-    if (
-      !question ||
-      !currentQuestionState ||
-      currentQuestionState.isSubmitted ||
-      !currentQuestionState.draftAnswer.trim()
-    ) {
+    if (!question || !canSubmitAnswer) {
       return;
     }
     await submitAnswer(question);
-  }, [question, currentQuestionState, submitAnswer]);
+  }, [question, canSubmitAnswer, submitAnswer]);
 
   const handleToggleEliminateOption = useCallback(
     (label: string) => {
@@ -302,9 +328,10 @@ export const QuestionSolver: React.FC = () => {
     enabled: Boolean(activeSession && currentQuestionId && currentQuestionState),
     isMcq: question?.questionType === 'mcq',
     isSubmitted: Boolean(currentQuestionState?.isSubmitted),
-    hasDraftAnswer: Boolean(currentQuestionState?.draftAnswer.trim()),
+    hasDraftAnswer: canSubmitAnswer,
     canGoPrev: currentIdx > 0,
     canGoNext: currentIdx < totalQuestions - 1,
+    canUseScratchpad: isDesktopSmUp,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
@@ -335,15 +362,30 @@ export const QuestionSolver: React.FC = () => {
     handleToggleEliminateOption(label);
   };
 
-  const handleSprChange = (val: string) => {
+  const handleSprChange = (rawVal: string) => {
     if (currentQuestionState.isSubmitted) return;
+    const val = rawVal.trim().replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
     if (!/^-?[0-9./]*$/.test(val)) return;
+    if (val.startsWith('/') || val.startsWith('-/')) return;
     const maxLen = val.startsWith('-') ? 6 : 5;
     if (val.length > maxLen) return;
     const slashCount = (val.match(/\//g) || []).length;
     const dotCount = (val.match(/\./g) || []).length;
-    if (slashCount > 1 || dotCount > 1) return;
+    if (slashCount > 1 || dotCount > 1 || (slashCount > 0 && dotCount > 0)) {
+      return;
+    }
     setDraftAnswer(currentQuestionId, val);
+  };
+
+  const handleSprHelperKey = (symbol: '-' | '/' | '.') => {
+    if (currentQuestionState.isSubmitted) return;
+    const cur = currentQuestionState.draftAnswer;
+    if (symbol === '-') {
+      const next = cur.startsWith('-') ? cur.slice(1) : `-${cur}`;
+      handleSprChange(next);
+      return;
+    }
+    handleSprChange(`${cur}${symbol}`);
   };
 
   const handleShareQuestion = async () => {
@@ -411,7 +453,13 @@ export const QuestionSolver: React.FC = () => {
               className="font-mono text-lg sm:text-xl font-medium tabular-nums tracking-tight text-[#F5F5F5]"
               title="Question elapsed time"
             >
-              {isTimerHidden ? '—' : formatDuration(questionTimerMs)}
+              {isTimerHidden
+                ? '—'
+                : formatDuration(
+                    currentQuestionState.isSubmitted
+                      ? currentQuestionState.timeSpent
+                      : questionTimerMs
+                  )}
             </span>
 
             <button
@@ -572,7 +620,7 @@ export const QuestionSolver: React.FC = () => {
       >
         {/* Transparent Full-Screen HTML5 Canvas Scratchpad Overlay */}
         <ScratchpadOverlay
-          isOpen={isScratchpadOpen}
+          isOpen={isScratchpadOpen && isDesktopSmUp}
           questionId={currentQuestionId}
           strokes={scratchpadMap[currentQuestionId] || []}
           onChangeStrokes={handleUpdateScratchpadStrokes}
@@ -582,7 +630,7 @@ export const QuestionSolver: React.FC = () => {
         {/* Dedicated Examination Content Container */}
         <div
           className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
-            isScratchpadOpen ? 'pointer-events-none select-none' : ''
+            isScratchpadOpen && isDesktopSmUp ? 'pointer-events-none select-none' : ''
           }`}
         >
         {isLoadingQuestion ? (
@@ -766,6 +814,7 @@ export const QuestionSolver: React.FC = () => {
                         role="button"
                         tabIndex={isSubmitted || isEliminated ? -1 : 0}
                         aria-disabled={isSubmitted || isEliminated}
+                        aria-pressed={isSelected}
                         onClick={() => handleSelectMcq(opt.label)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -872,11 +921,7 @@ export const QuestionSolver: React.FC = () => {
                       value={currentQuestionState.draftAnswer}
                       onChange={(e) => handleSprChange(e.target.value)}
                       onKeyDown={(e) => {
-                        if (
-                          e.key === 'Enter' &&
-                          !currentQuestionState.isSubmitted &&
-                          currentQuestionState.draftAnswer.trim()
-                        ) {
+                        if (e.key === 'Enter' && canSubmitAnswer) {
                           e.preventDefault();
                           handleSubmit();
                         } else if (e.key === 'Escape') {
@@ -894,6 +939,39 @@ export const QuestionSolver: React.FC = () => {
                         <X className="h-4 w-4 shrink-0 text-red-400" />
                       ))}
                   </div>
+
+                  {/* Mobile quick-insert helper keys since inputMode="decimal" omits '/' and often '-' on iOS/Android */}
+                  {!currentQuestionState.isSubmitted && (
+                    <div className="flex sm:hidden items-center gap-2 px-1">
+                      <span className="text-xs text-[#71717A]">Quick keys:</span>
+                      {(
+                        [
+                          { char: '-', label: '−' },
+                          { char: '/', label: '/' },
+                          { char: '.', label: '.' },
+                        ] as const
+                      ).map((k) => (
+                        <button
+                          key={k.char}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSprHelperKey(k.char)}
+                          className="flex h-8 min-w-[2.5rem] items-center justify-center rounded-full border border-[#29292E] bg-[#18181B] px-3 font-mono text-sm font-medium text-[#F5F5F5] active:scale-95 transition-transform"
+                          aria-label={`Insert ${k.char === '-' ? 'negative sign' : k.char === '/' ? 'fraction slash' : 'decimal point'}`}
+                        >
+                          {k.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {!currentQuestionState.isSubmitted &&
+                    currentQuestionState.draftAnswer.trim().length > 0 &&
+                    !canSubmitAnswer && (
+                      <p className="px-1 text-xs text-amber-300/90">
+                        Enter a complete number or fraction (for example, 7/2 or -1.5).
+                      </p>
+                    )}
 
                   <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-[#71717A]">
                     <span>
@@ -922,7 +1000,7 @@ export const QuestionSolver: React.FC = () => {
                   <Button3D
                     variant="primary"
                     size="lg"
-                    disabled={!currentQuestionState.draftAnswer.trim()}
+                    disabled={!canSubmitAnswer}
                     onClick={handleSubmit}
                     className="px-7"
                   >
@@ -934,6 +1012,7 @@ export const QuestionSolver: React.FC = () => {
               {/* Instant Feedback & Explanation Area */}
               {currentQuestionState.isSubmitted && (
                 <div
+                  aria-live="polite"
                   className={`overflow-hidden rounded-2xl border bg-[#111113] ${
                     currentQuestionState.isCorrect
                       ? 'animate-feedback-correct border-emerald-500/30'

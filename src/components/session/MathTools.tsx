@@ -577,12 +577,14 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
         >
           {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
           {isInteracting && <div className="absolute inset-0 z-20 cursor-move" />}
-          <iframe
-            src="https://www.desmos.com/testing/cb-digital-sat/graphing"
-            title="Desmos SAT Graphing Calculator"
-            className="h-full w-full border-0"
-            allow="clipboard-write"
-          />
+          {hasLoadedOnce && (
+            <iframe
+              src="https://www.desmos.com/testing/cb-digital-sat/graphing"
+              title="Desmos SAT Graphing Calculator"
+              className="h-full w-full border-0"
+              allow="clipboard-write"
+            />
+          )}
         </div>
       </div>
     </>
@@ -617,7 +619,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#18181B] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 hidden sm:flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#18181B] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Reference Sheet"
     >

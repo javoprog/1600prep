@@ -10,6 +10,7 @@ export interface UsePracticeShortcutsParams {
   hasDraftAnswer: boolean;
   canGoPrev: boolean;
   canGoNext: boolean;
+  canUseScratchpad?: boolean;
   onSelectOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onToggleEliminateOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onSubmitAnswer: () => void;
@@ -26,6 +27,7 @@ export function usePracticeShortcuts({
   hasDraftAnswer,
   canGoPrev,
   canGoNext,
+  canUseScratchpad = true,
   onSelectOption,
   onToggleEliminateOption,
   onSubmitAnswer,
@@ -62,8 +64,9 @@ export function usePracticeShortcuts({
         return;
       }
 
-      // 'S' / 's': toggle Scratchpad overlay
+      // 'S' / 's': toggle Scratchpad overlay (desktop/tablet viewports only)
       if (e.key === 's' || e.key === 'S') {
+        if (!canUseScratchpad) return;
         e.preventDefault();
         onToggleScratchpad();
         return;
@@ -89,9 +92,9 @@ export function usePracticeShortcuts({
         return;
       }
 
-      // Enter / Space: submit answer (avoid intercepting when a button or link has focus)
+      // Enter / Space: submit answer (avoid intercepting when an interactive control has focus)
       if (e.key === 'Enter' || e.key === ' ') {
-        if (target?.tagName === 'BUTTON' || target?.tagName === 'A') return;
+        if (target?.closest('button, a, [role="button"]')) return;
         if (!isSubmitted && hasDraftAnswer) {
           e.preventDefault();
           onSubmitAnswer();
@@ -152,6 +155,7 @@ export function usePracticeShortcuts({
     hasDraftAnswer,
     canGoPrev,
     canGoNext,
+    canUseScratchpad,
     onSelectOption,
     onToggleEliminateOption,
     onSubmitAnswer,

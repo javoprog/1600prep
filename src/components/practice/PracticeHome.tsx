@@ -54,7 +54,7 @@ export const PracticeHome: React.FC = () => {
             {catalogError}
           </p>
           <div className="mt-6 flex justify-center">
-            <Button3D variant="primary" onClick={reloadCatalog}>
+            <Button3D variant="primary" onClick={() => reloadCatalog(true)}>
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry Connection</span>
             </Button3D>
@@ -76,7 +76,11 @@ export const PracticeHome: React.FC = () => {
             <WifiOff className="h-4 w-4 shrink-0 text-white" />
             <span>{offlineWarning}</span>
           </div>
-          <Button3D variant="secondary" size="sm" onClick={reloadCatalog}>
+          <Button3D
+            variant="secondary"
+            size="sm"
+            onClick={() => reloadCatalog(true)}
+          >
             <RefreshCw className="h-3 w-3" />
             <span>Reconnect</span>
           </Button3D>
