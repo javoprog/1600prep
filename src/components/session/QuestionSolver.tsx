@@ -12,10 +12,12 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Highlighter,
   Loader2,
   PenTool,
   RefreshCw,
   Share2,
+  Trash2,
   Undo2,
   X,
   XCircle,
@@ -27,6 +29,12 @@ import {
 } from '@/services/questionBank';
 import { Question } from '@/types';
 import { RichMathContent } from '@/components/question/RichMathContent';
+import {
+  HIGHLIGHT_COLORS,
+  HighlightablePassage,
+  HighlightColor,
+  PassageHighlight,
+} from '@/components/question/HighlightablePassage';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Button3D } from '@/components/ui/Button3D';
 import {
@@ -65,6 +73,9 @@ export const QuestionSolver: React.FC = () => {
   const [questionError, setQuestionError] = useState<string | null>(null);
   const [eliminatedMap, setEliminatedMap] = useState<Record<string, string[]>>({});
   const [scratchpadMap, setScratchpadMap] = useState<Record<string, ScratchpadStroke[]>>({});
+  const [highlightMap, setHighlightMap] = useState<Record<string, PassageHighlight[]>>({});
+  const [isHighlighterMode, setIsHighlighterMode] = useState<boolean>(false);
+  const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow');
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [calculatorLayout, setCalculatorLayout] =
@@ -299,6 +310,24 @@ export const QuestionSolver: React.FC = () => {
     });
   }, []);
 
+  const handleToggleHighlighter = useCallback(() => {
+    setIsHighlighterMode((prev) => {
+      const next = !prev;
+      soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+      return next;
+    });
+  }, []);
+
+  const handleUpdateHighlights = useCallback(
+    (qId: string, nextHighlights: PassageHighlight[]) => {
+      setHighlightMap((prev) => ({
+        ...prev,
+        [qId]: nextHighlights,
+      }));
+    },
+    []
+  );
+
   const handleEscapeOverlays = useCallback((): boolean => {
     if (isScratchpadOpen) {
       setIsScratchpadOpen(false);
@@ -316,13 +345,28 @@ export const QuestionSolver: React.FC = () => {
       setIsCalculatorOpen(false);
       return true;
     }
+    if (isHighlighterMode) {
+      setIsHighlighterMode(false);
+      return true;
+    }
     return false;
   }, [
     isScratchpadOpen,
     isSprDirectionsOpen,
     isReferenceOpen,
     isCalculatorOpen,
+    isHighlighterMode,
   ]);
+
+  const currentMeta = question || metaMap.get(currentQuestionId || '');
+  const isMathSubject =
+    (currentMeta?.subject || activeSession?.subject) === 'math';
+  const hasPassage = Boolean(
+    question?.passage && question.passage.trim().length > 0
+  );
+  // In Bluebook Digital SAT, only Reading & Writing uses the 2-column Passage/Question split;
+  // Math is always a single column with any stimulus equation/table/graph directly above the stem.
+  const useSplitPassageColumn = hasPassage && !isMathSubject;
 
   usePracticeShortcuts({
     enabled: Boolean(activeSession && currentQuestionId && currentQuestionState),
@@ -332,12 +376,14 @@ export const QuestionSolver: React.FC = () => {
     canGoPrev: currentIdx > 0,
     canGoNext: currentIdx < totalQuestions - 1,
     canUseScratchpad: isDesktopSmUp,
+    canUseHighlighter: useSplitPassageColumn,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
     onPrevQuestion: () => goToQuestionIndex(currentIdx - 1),
     onNextQuestion: () => goToQuestionIndex(currentIdx + 1),
     onToggleScratchpad: handleToggleScratchpad,
+    onToggleHighlighter: handleToggleHighlighter,
     onEscape: handleEscapeOverlays,
   });
 
@@ -345,13 +391,11 @@ export const QuestionSolver: React.FC = () => {
     return null;
   }
 
-  const currentMeta = question || metaMap.get(currentQuestionId);
-  const isMathSubject =
-    (currentMeta?.subject || activeSession.subject) === 'math';
   const sectionLabel =
     currentMeta?.subjectLabel ||
     (activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math');
   const diffBadge = getDifficultyBadgeInfo(currentMeta?.difficulty);
+  const currentHighlights = highlightMap[currentQuestionId] || [];
   const footerBtnClass = 'h-9 whitespace-nowrap sm:h-10 sm:px-4 sm:py-2 sm:text-sm';
   const footerNavBtnClass = `${footerBtnClass} min-w-[90px] sm:min-w-[108px]`;
 
@@ -415,12 +459,6 @@ export const QuestionSolver: React.FC = () => {
     }
   };
 
-  const hasPassage = Boolean(
-    question?.passage && question.passage.trim().length > 0
-  );
-  // In Bluebook Digital SAT, only Reading & Writing uses the 2-column Passage/Question split;
-  // Math is always a single column with any stimulus equation/table/graph directly above the stem.
-  const useSplitPassageColumn = hasPassage && !isMathSubject;
   const isCalculatorDocked =
     isMathSubject &&
     isCalculatorOpen &&
@@ -672,12 +710,93 @@ export const QuestionSolver: React.FC = () => {
             {/* Left Examination Column: Reading & Writing Passage (when present) */}
             {useSplitPassageColumn && (
               <div className="lg:col-span-6 lg:border-r lg:border-[#1F1F23] lg:pr-10 lg:sticky lg:top-20 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
-                <div className="mb-4 flex items-center text-xs text-[#71717A]">
-                  <span>Passage</span>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#1F1F23] pb-3">
+                  <div className="flex items-center gap-2 text-xs text-[#71717A]">
+                    <span>Passage</span>
+                    {currentHighlights.length > 0 && (
+                      <span className="rounded-full border border-[#29292E] bg-[#141417] px-2 py-0.5 text-[11px] tabular-nums text-[#A1A1AA]">
+                        {currentHighlights.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Comfortable Passage Highlighter Controls */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 rounded-full border border-[#29292E] bg-[#111113] p-0.5">
+                      <button
+                        type="button"
+                        onClick={handleToggleHighlighter}
+                        title={
+                          isHighlighterMode
+                            ? 'Highlighter Mode: On (select or double-click text to highlight immediately) — Press H'
+                            : 'Toggle Highlighter Mode (or select any text to highlight) — Press H'
+                        }
+                        aria-pressed={isHighlighterMode}
+                        className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-all cursor-pointer ${
+                          isHighlighterMode
+                            ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                            : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                        }`}
+                      >
+                        <Highlighter className="h-3.5 w-3.5" />
+                        <span>Highlight</span>
+                      </button>
+
+                      <div className="flex items-center gap-1 px-1.5">
+                        {HIGHLIGHT_COLORS.map((c) => {
+                          const isSelectedColor = highlightColor === c.id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                soundEngine.play('select');
+                                setHighlightColor(c.id);
+                                if (!isHighlighterMode) {
+                                  setIsHighlighterMode(true);
+                                }
+                              }}
+                              title={`${c.label} highlighter`}
+                              aria-label={`Use ${c.label} highlighter`}
+                              aria-pressed={isSelectedColor}
+                              className={`h-3.5 w-3.5 rounded-full ${c.swatchClass} transition-transform hover:scale-115 cursor-pointer ${
+                                isSelectedColor
+                                  ? 'ring-2 ring-white ring-offset-2 ring-offset-[#111113] scale-110'
+                                  : 'opacity-55 hover:opacity-100'
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {currentHighlights.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.play('clear');
+                          handleUpdateHighlights(currentQuestionId, []);
+                        }}
+                        title="Clear all passage highlights"
+                        aria-label="Clear all passage highlights"
+                        className="inline-flex h-8 items-center gap-1 rounded-full border border-[#29292E] bg-[#111113] px-2.5 text-xs text-[#A1A1AA] hover:border-[#3F3F46] hover:text-red-300 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Clear</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <RichMathContent
+
+                <HighlightablePassage
                   html={question.passage}
-                  variant="passage"
+                  highlights={currentHighlights}
+                  onChangeHighlights={(next) =>
+                    handleUpdateHighlights(currentQuestionId, next)
+                  }
+                  isHighlighterMode={isHighlighterMode}
+                  activeColor={highlightColor}
+                  onChangeActiveColor={setHighlightColor}
                 />
               </div>
             )}
