@@ -7,11 +7,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Check, Highlighter, Trash2 } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import { RichMathContent } from '@/components/question/RichMathContent';
 import { soundEngine } from '@/services/sound/soundEngine';
 
-export type HighlightColor = 'yellow' | 'green' | 'blue';
+export type HighlightColor = 'yellow' | 'green' | 'blue' | 'red';
 
 export interface PassageHighlight {
   id: string;
@@ -28,15 +28,13 @@ export const HIGHLIGHT_COLORS: ReadonlyArray<{
   { id: 'yellow', label: 'Yellow', swatchClass: 'bg-amber-400' },
   { id: 'green', label: 'Green', swatchClass: 'bg-[#69ff00]' },
   { id: 'blue', label: 'Blue', swatchClass: 'bg-sky-400' },
+  { id: 'red', label: 'Red', swatchClass: 'bg-red-500' },
 ];
 
 interface HighlightablePassageProps {
   html?: string;
   highlights: PassageHighlight[];
   onChangeHighlights: (next: PassageHighlight[]) => void;
-  isHighlighterMode: boolean;
-  activeColor: HighlightColor;
-  onChangeActiveColor: (color: HighlightColor) => void;
 }
 
 interface FloatingPopoverState {
@@ -268,13 +266,11 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
   html,
   highlights,
   onChangeHighlights,
-  isHighlighterMode,
-  activeColor,
-  onChangeActiveColor,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const isPointerSelectingRef = useRef<boolean>(false);
+  const selectionTimerRef = useRef<number | null>(null);
   const [popover, setPopover] = useState<FloatingPopoverState | null>(null);
 
   // Re-apply marks cleanly whenever passage html or highlight list updates
@@ -372,38 +368,57 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
   const commitSelectionHighlight = useCallback(
     (start: number, end: number, color: HighlightColor) => {
       soundEngine.play('select');
-      onChangeActiveColor(color);
       onChangeHighlights(upsertHighlightRange(highlights, start, end, color));
       window.getSelection()?.removeAllRanges();
       setPopover(null);
     },
-    [highlights, onChangeActiveColor, onChangeHighlights]
+    [highlights, onChangeHighlights]
   );
 
   const finalizeSelectionInteraction = useCallback(() => {
     const info = extractAndTrimPassageSelection();
     if (!info) return;
 
-    if (isHighlighterMode) {
-      commitSelectionHighlight(info.start, info.end, activeColor);
-    } else {
-      const anchor = computeFloatingAnchor(info.rect);
-      setPopover({
+    const anchor = computeFloatingAnchor(info.rect);
+    setPopover((prev) => {
+      if (
+        prev?.mode === 'selection' &&
+        prev.start === info.start &&
+        prev.end === info.end &&
+        Math.abs(prev.x - anchor.x) < 1 &&
+        Math.abs(prev.y - anchor.y) < 1
+      ) {
+        return prev;
+      }
+      return {
         ...anchor,
         mode: 'selection',
         start: info.start,
         end: info.end,
-      });
-    }
-  }, [
-    activeColor,
-    commitSelectionHighlight,
-    computeFloatingAnchor,
-    extractAndTrimPassageSelection,
-    isHighlighterMode,
-  ]);
+      };
+    });
+  }, [computeFloatingAnchor, extractAndTrimPassageSelection]);
+
+  const scheduleFinalizeSelection = useCallback(
+    (delayMs = 0) => {
+      if (selectionTimerRef.current !== null) {
+        window.clearTimeout(selectionTimerRef.current);
+      }
+      selectionTimerRef.current = window.setTimeout(() => {
+        selectionTimerRef.current = null;
+        if (!isPointerSelectingRef.current) {
+          finalizeSelectionInteraction();
+        }
+      }, delayMs);
+    },
+    [finalizeSelectionInteraction]
+  );
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (selectionTimerRef.current !== null) {
+      window.clearTimeout(selectionTimerRef.current);
+      selectionTimerRef.current = null;
+    }
     isPointerSelectingRef.current = true;
     const target = e.target as HTMLElement | null;
     if (!target?.closest('mark[data-sat-hl]')) {
@@ -414,29 +429,22 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
   const handlePointerUp = () => {
     isPointerSelectingRef.current = false;
     // Defer 0ms so native single/double-click selection updates commit first
-    window.setTimeout(() => {
-      finalizeSelectionInteraction();
-    }, 0);
+    scheduleFinalizeSelection(0);
   };
 
   const handleDoubleClick = () => {
     isPointerSelectingRef.current = false;
-    window.setTimeout(() => {
-      finalizeSelectionInteraction();
-    }, 0);
+    scheduleFinalizeSelection(0);
   };
 
   // Handle touch/keyboard selection changes gracefully & ensure pointer state never sticks if released outside
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    let timer: number | undefined;
     const handleGlobalPointerEnd = () => {
       if (!isPointerSelectingRef.current) return;
       isPointerSelectingRef.current = false;
-      window.setTimeout(() => {
-        finalizeSelectionInteraction();
-      }, 0);
+      scheduleFinalizeSelection(0);
     };
 
     const handleSelectionChange = () => {
@@ -451,24 +459,22 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
         return;
       }
 
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        if (!isPointerSelectingRef.current) {
-          finalizeSelectionInteraction();
-        }
-      }, 140);
+      scheduleFinalizeSelection(140);
     };
 
     window.addEventListener('pointerup', handleGlobalPointerEnd);
     window.addEventListener('pointercancel', handleGlobalPointerEnd);
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
-      if (timer) window.clearTimeout(timer);
+      if (selectionTimerRef.current !== null) {
+        window.clearTimeout(selectionTimerRef.current);
+        selectionTimerRef.current = null;
+      }
       window.removeEventListener('pointerup', handleGlobalPointerEnd);
       window.removeEventListener('pointercancel', handleGlobalPointerEnd);
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
-  }, [finalizeSelectionInteraction]);
+  }, [scheduleFinalizeSelection]);
 
   // Dismiss floating popover cleanly on scroll, escape, or outside click
   useEffect(() => {
@@ -527,7 +533,6 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
   const handleRecolorExisting = (color: HighlightColor) => {
     if (!popover?.existingId) return;
     soundEngine.play('select');
-    onChangeActiveColor(color);
     onChangeHighlights(
       normalizeAndMergeHighlights(
         highlights.map((h) =>
@@ -553,7 +558,6 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         onClick={handlePassageClick}
-        className={isHighlighterMode ? 'cursor-text' : undefined}
       >
         <RichMathContent html={html} variant="passage" />
       </div>
@@ -572,14 +576,8 @@ export const HighlightablePassage: React.FC<HighlightablePassageProps> = ({
               : 'translate(-50%, -100%)',
           }}
           onMouseDown={(e) => e.preventDefault()}
-          className="fixed z-50 flex items-center gap-1.5 rounded-full border border-[#3F3F46] bg-[#141417]/95 px-2.5 py-1.5 shadow-[0_14px_34px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-content-in"
+          className="fixed z-50 flex items-center gap-1.5 rounded-full border border-[#3F3F46] bg-[#141417]/95 px-2.5 py-1.5 shadow-[0_14px_34px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-page-fade"
         >
-          {popover.mode === 'selection' && (
-            <span className="flex items-center gap-1 pl-0.5 pr-1 text-[11px] font-medium text-[#A1A1AA] select-none">
-              <Highlighter className="h-3 w-3 text-[#69ff00]" />
-              <span>Highlight</span>
-            </span>
-          )}
 
           <div className="flex items-center gap-1.5">
             {HIGHLIGHT_COLORS.map((c) => {

@@ -11,14 +11,12 @@ export interface UsePracticeShortcutsParams {
   canGoPrev: boolean;
   canGoNext: boolean;
   canUseScratchpad?: boolean;
-  canUseHighlighter?: boolean;
   onSelectOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onToggleEliminateOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onSubmitAnswer: () => void;
   onPrevQuestion: () => void;
   onNextQuestion: () => void;
   onToggleScratchpad: () => void;
-  onToggleHighlighter?: () => void;
   onEscape: () => boolean; // returns true if an overlay/modal was closed
 }
 
@@ -30,14 +28,12 @@ export function usePracticeShortcuts({
   canGoPrev,
   canGoNext,
   canUseScratchpad = true,
-  canUseHighlighter = false,
   onSelectOption,
   onToggleEliminateOption,
   onSubmitAnswer,
   onPrevQuestion,
   onNextQuestion,
   onToggleScratchpad,
-  onToggleHighlighter,
   onEscape,
 }: UsePracticeShortcutsParams): void {
   useEffect(() => {
@@ -73,14 +69,6 @@ export function usePracticeShortcuts({
         if (!canUseScratchpad) return;
         e.preventDefault();
         onToggleScratchpad();
-        return;
-      }
-
-      // 'H' / 'h': toggle R&W Passage Highlighter mode
-      if (e.key === 'h' || e.key === 'H') {
-        if (!canUseHighlighter || !onToggleHighlighter) return;
-        e.preventDefault();
-        onToggleHighlighter();
         return;
       }
 
@@ -168,14 +156,12 @@ export function usePracticeShortcuts({
     canGoPrev,
     canGoNext,
     canUseScratchpad,
-    canUseHighlighter,
     onSelectOption,
     onToggleEliminateOption,
     onSubmitAnswer,
     onPrevQuestion,
     onNextQuestion,
     onToggleScratchpad,
-    onToggleHighlighter,
     onEscape,
   ]);
 }

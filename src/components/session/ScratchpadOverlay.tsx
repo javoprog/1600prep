@@ -460,7 +460,7 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
           style={{
             transform: `translate(calc(-50% + ${toolbarOffset.x}px), ${toolbarOffset.y}px)`,
           }}
-          className="fixed bottom-20 left-1/2 z-40 flex max-w-[calc(100vw-24px)] items-center gap-1.5 rounded-full border border-[#29292E] bg-[#111113]/95 px-2 py-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl select-none animate-content-in"
+          className="fixed bottom-20 left-1/2 z-40 flex max-w-[calc(100vw-24px)] items-center gap-1.5 rounded-full border border-[#29292E] bg-[#111113]/95 px-2 py-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl select-none animate-page-fade"
         >
           {/* Subtle Drag Handle (double-click to re-center) */}
           <button

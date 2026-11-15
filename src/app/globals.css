@@ -342,39 +342,45 @@ body {
 .sat-rich-passage mark.sat-hl {
   display: inline;
   vertical-align: baseline;
-  border-radius: 0.28rem;
-  padding: 0.06em 0.14em;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition: background-color 140ms ease;
 }
 
 .sat-rich-passage mark.sat-hl-yellow {
-  background-color: rgba(250, 204, 21, 0.24);
-  border-bottom: 1.5px solid rgba(250, 204, 21, 0.72);
-  color: #FEF9C3;
+  background-color: rgba(250, 204, 21, 0.35);
+  border-bottom: 2px solid #FACC15;
 }
 .sat-rich-passage mark.sat-hl-yellow:hover {
-  background-color: rgba(250, 204, 21, 0.34);
+  background-color: rgba(250, 204, 21, 0.48);
 }
 
 .sat-rich-passage mark.sat-hl-green {
-  background-color: rgba(105, 255, 0, 0.17);
-  border-bottom: 1.5px solid rgba(105, 255, 0, 0.68);
-  color: #ECFCCB;
+  background-color: rgba(105, 255, 0, 0.32);
+  border-bottom: 2px solid #69ff00;
 }
 .sat-rich-passage mark.sat-hl-green:hover {
-  background-color: rgba(105, 255, 0, 0.27);
+  background-color: rgba(105, 255, 0, 0.45);
 }
 
 .sat-rich-passage mark.sat-hl-blue {
-  background-color: rgba(56, 189, 248, 0.22);
-  border-bottom: 1.5px solid rgba(56, 189, 248, 0.72);
-  color: #E0F2FE;
+  background-color: rgba(56, 189, 248, 0.35);
+  border-bottom: 2px solid #38BDF8;
 }
 .sat-rich-passage mark.sat-hl-blue:hover {
-  background-color: rgba(56, 189, 248, 0.32);
+  background-color: rgba(56, 189, 248, 0.48);
+}
+
+.sat-rich-passage mark.sat-hl-red {
+  background-color: rgba(239, 68, 68, 0.38);
+  border-bottom: 2px solid #EF4444;
+}
+.sat-rich-passage mark.sat-hl-red:hover {
+  background-color: rgba(239, 68, 68, 0.5);
 }
 
 .sat-rich-content p {
