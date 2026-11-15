@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import katex from 'katex';
 import {
   GripHorizontal,
+  Moon,
+  Sun,
   X,
 } from 'lucide-react';
 import { soundEngine } from '@/services/sound/soundEngine';
@@ -219,6 +221,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
   onClose,
 }) => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [isDesmosDark, setIsDesmosDark] = useState(true);
   const [bounds, setBounds] = useState<WindowBounds>({
     x: 24,
     y: 76,
@@ -555,25 +558,53 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.play('click');
-              onClose();
-            }}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Close calculator"
-            aria-label="Close calculator"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('select');
+                setIsDesmosDark((prev) => !prev);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              title={
+                isDesmosDark
+                  ? 'Switch Desmos to light mode'
+                  : 'Switch Desmos to dark mode'
+              }
+              aria-label={
+                isDesmosDark
+                  ? 'Switch Desmos to light mode'
+                  : 'Switch Desmos to dark mode'
+              }
+              aria-pressed={isDesmosDark}
+            >
+              {isDesmosDark ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('click');
+                onClose();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              title="Close calculator"
+              aria-label="Close calculator"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Embedded Desmos SAT Graphing Calculator */}
         <div
-          className={`relative flex-1 overflow-hidden bg-white ${
-            isDocked ? '' : 'rounded-b-2xl'
-          }`}
+          className={`relative flex-1 overflow-hidden ${
+            isDesmosDark ? 'bg-[#141414]' : 'bg-white'
+          } ${isDocked ? '' : 'rounded-b-2xl'}`}
         >
           {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
           {isInteracting && <div className="absolute inset-0 z-20 cursor-move" />}
@@ -581,7 +612,12 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
             <iframe
               src="https://www.desmos.com/testing/cb-digital-sat/graphing"
               title="Desmos SAT Graphing Calculator"
-              className="h-full w-full border-0"
+              style={
+                isDesmosDark
+                  ? { filter: 'invert(0.92) hue-rotate(180deg)' }
+                  : undefined
+              }
+              className="h-full w-full border-0 transition-[filter] duration-150"
               allow="clipboard-write"
             />
           )}
@@ -619,7 +655,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 hidden sm:flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#18181B] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 hidden sm:flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#141417] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Reference Sheet"
     >
@@ -651,19 +687,19 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
       {/* Official Bluebook SAT Reference Sheet Content (Best-Fit Form) */}
       <div
-        className={`overflow-y-auto rounded-b-2xl bg-[#F8F8F6] p-5 sm:p-6 text-[#111113] ${
+        className={`overflow-y-auto rounded-b-2xl bg-[#111113] p-5 sm:p-6 text-[#F5F5F5] ${
           isDragging ? 'pointer-events-none' : ''
         }`}
       >
         {/* Row 1: Circle, Rectangle, Triangle, Pythagorean Theorem, Special Right Triangles */}
-        <div className="grid grid-cols-2 sm:grid-cols-12 gap-y-6 gap-x-3 items-end border-b border-[#D4D4D8] pb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-12 gap-y-6 gap-x-3 items-end border-b border-[#29292E] pb-5">
           {/* 1. Circle */}
           <div className="col-span-1 sm:col-span-2 flex flex-col items-center text-center">
-            <svg viewBox="0 0 100 90" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.6">
+            <svg viewBox="0 0 100 90" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
               <circle cx="50" cy="45" r="32" />
-              <circle cx="50" cy="45" r="2.2" fill="#111113" />
+              <circle cx="50" cy="45" r="2.2" fill="#E4E4E7" />
               <line x1="50" y1="45" x2="82" y2="45" />
-              <text x="63" y="39" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">r</text>
+              <text x="63" y="39" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">r</text>
             </svg>
             <div className="mt-2 space-y-1 text-sm">
               <div><KatexFormula tex="A = \pi r^2" /></div>
@@ -673,10 +709,10 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 2. Rectangle */}
           <div className="col-span-1 sm:col-span-2 flex flex-col items-center text-center">
-            <svg viewBox="0 0 110 90" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.6">
+            <svg viewBox="0 0 110 90" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
               <rect x="18" y="24" width="66" height="44" />
-              <text x="48" y="18" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
-              <text x="89" y="50" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
+              <text x="48" y="18" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
+              <text x="89" y="50" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
             </svg>
             <div className="mt-2 text-sm pb-3">
               <KatexFormula tex="A = \ell w" />
@@ -685,12 +721,12 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 3. Triangle */}
           <div className="col-span-1 sm:col-span-2 flex flex-col items-center text-center">
-            <svg viewBox="0 0 110 90" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.6">
+            <svg viewBox="0 0 110 90" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
               <polygon points="16,68 92,68 46,18" />
               <line x1="46" y1="18" x2="46" y2="68" strokeDasharray="3.5 2.5" />
               <polyline points="46,60 54,60 54,68" strokeWidth="1.3" />
-              <text x="51" y="48" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
-              <text x="51" y="83" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">b</text>
+              <text x="51" y="48" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
+              <text x="51" y="83" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">b</text>
             </svg>
             <div className="mt-2 text-sm pb-1">
               <KatexFormula tex="A = \frac{1}{2}bh" />
@@ -699,12 +735,12 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 4. Right Triangle (Pythagorean Theorem) */}
           <div className="col-span-1 sm:col-span-2 flex flex-col items-center text-center">
-            <svg viewBox="0 0 115 90" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.6">
+            <svg viewBox="0 0 115 90" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
               <polygon points="22,68 94,68 22,20" />
               <polyline points="22,59 31,59 31,68" strokeWidth="1.3" />
-              <text x="9" y="48" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">b</text>
-              <text x="55" y="83" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">a</text>
-              <text x="61" y="39" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">c</text>
+              <text x="9" y="48" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">b</text>
+              <text x="55" y="83" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">a</text>
+              <text x="61" y="39" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">c</text>
             </svg>
             <div className="mt-2 text-sm pb-3">
               <KatexFormula tex="c^2 = a^2 + b^2" />
@@ -715,44 +751,44 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
           <div className="col-span-2 sm:col-span-4 flex flex-col items-center text-center">
             <div className="grid grid-cols-2 gap-1 w-full items-end">
               {/* 30-60-90 */}
-              <svg viewBox="0 0 135 90" className="h-20 w-full stroke-[#111113]" fill="none" strokeWidth="1.6">
+              <svg viewBox="0 0 135 90" className="h-20 w-full stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
                 <polygon points="22,68 112,68 22,18" />
                 <polyline points="22,59 31,59 31,68" strokeWidth="1.3" />
-                <text x="9" y="47" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">x</text>
-                <text x="52" y="84" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">x√3</text>
-                <text x="68" y="37" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">2x</text>
-                <text x="26" y="35" fill="#111113" stroke="none" fontSize="10">60°</text>
-                <text x="80" y="64" fill="#111113" stroke="none" fontSize="10">30°</text>
+                <text x="9" y="47" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">x</text>
+                <text x="52" y="84" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">x√3</text>
+                <text x="68" y="37" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">2x</text>
+                <text x="26" y="35" fill="#E4E4E7" stroke="none" fontSize="10">60°</text>
+                <text x="80" y="64" fill="#E4E4E7" stroke="none" fontSize="10">30°</text>
               </svg>
 
               {/* 45-45-90 */}
-              <svg viewBox="0 0 120 90" className="h-20 w-full stroke-[#111113]" fill="none" strokeWidth="1.6">
+              <svg viewBox="0 0 120 90" className="h-20 w-full stroke-[#D4D4D8]" fill="none" strokeWidth="1.6">
                 <polygon points="24,68 88,68 24,14" />
                 <polyline points="24,59 33,59 33,68" strokeWidth="1.3" />
-                <text x="12" y="45" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s</text>
-                <text x="53" y="84" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s</text>
-                <text x="60" y="36" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s√2</text>
-                <text x="28" y="32" fill="#111113" stroke="none" fontSize="10">45°</text>
-                <text x="64" y="64" fill="#111113" stroke="none" fontSize="10">45°</text>
+                <text x="12" y="45" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s</text>
+                <text x="53" y="84" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s</text>
+                <text x="60" y="36" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">s√2</text>
+                <text x="28" y="32" fill="#E4E4E7" stroke="none" fontSize="10">45°</text>
+                <text x="64" y="64" fill="#E4E4E7" stroke="none" fontSize="10">45°</text>
               </svg>
             </div>
-            <div className="mt-2 text-xs font-medium text-[#111113] pb-3">
+            <div className="mt-2 text-xs font-medium text-[#D4D4D8] pb-3">
               Special Right Triangles
             </div>
           </div>
         </div>
 
         {/* Row 2: 5 3D Solids with Full 3D Drawings & Formulas */}
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-5 gap-y-6 gap-x-3 items-end border-b border-[#D4D4D8] pb-5">
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-5 gap-y-6 gap-x-3 items-end border-b border-[#29292E] pb-5">
           {/* 1. Rectangular Solid */}
           <div className="flex flex-col items-center text-center">
-            <svg viewBox="0 0 125 95" className="h-20 w-26 stroke-[#111113]" fill="none" strokeWidth="1.5">
+            <svg viewBox="0 0 125 95" className="h-20 w-26 stroke-[#D4D4D8]" fill="none" strokeWidth="1.5">
               <rect x="16" y="34" width="62" height="42" />
               <polyline points="16,34 38,16 100,16 100,58 78,76" />
               <line x1="78" y1="34" x2="100" y2="16" />
-              <text x="45" y="89" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
-              <text x="92" y="73" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
-              <text x="105" y="42" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
+              <text x="45" y="89" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
+              <text x="92" y="73" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
+              <text x="105" y="42" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
             </svg>
             <div className="mt-1.5 text-sm">
               <KatexFormula tex="V = \ell wh" />
@@ -761,16 +797,16 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 2. Right Circular Cylinder */}
           <div className="flex flex-col items-center text-center">
-            <svg viewBox="0 0 115 95" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.5">
+            <svg viewBox="0 0 115 95" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.5">
               <ellipse cx="52" cy="22" rx="30" ry="10" />
-              <circle cx="52" cy="22" r="1.8" fill="#111113" />
+              <circle cx="52" cy="22" r="1.8" fill="#E4E4E7" />
               <line x1="52" y1="22" x2="82" y2="22" />
-              <text x="64" y="19" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
+              <text x="64" y="19" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
               <line x1="22" y1="22" x2="22" y2="70" />
               <line x1="82" y1="22" x2="82" y2="70" />
               <path d="M 22 70 A 30 10 0 0 0 82 70" />
               <path d="M 22 70 A 30 10 0 0 1 82 70" strokeDasharray="3.5 2.5" />
-              <text x="88" y="50" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
+              <text x="88" y="50" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">h</text>
             </svg>
             <div className="mt-1.5 text-sm">
               <KatexFormula tex="V = \pi r^2 h" />
@@ -779,13 +815,13 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 3. Sphere */}
           <div className="flex flex-col items-center text-center">
-            <svg viewBox="0 0 110 95" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.5">
+            <svg viewBox="0 0 110 95" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.5">
               <circle cx="55" cy="46" r="32" />
               <path d="M 23 46 A 32 10 0 0 0 87 46" />
               <path d="M 23 46 A 32 10 0 0 1 87 46" strokeDasharray="3.5 2.5" />
-              <circle cx="55" cy="46" r="1.8" fill="#111113" />
+              <circle cx="55" cy="46" r="1.8" fill="#E4E4E7" />
               <line x1="55" y1="46" x2="87" y2="46" />
-              <text x="68" y="42" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
+              <text x="68" y="42" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
             </svg>
             <div className="mt-1.5 text-sm">
               <KatexFormula tex="V = \frac{4}{3}\pi r^3" />
@@ -794,7 +830,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 4. Right Circular Cone */}
           <div className="flex flex-col items-center text-center">
-            <svg viewBox="0 0 110 95" className="h-20 w-24 stroke-[#111113]" fill="none" strokeWidth="1.5">
+            <svg viewBox="0 0 110 95" className="h-20 w-24 stroke-[#D4D4D8]" fill="none" strokeWidth="1.5">
               <line x1="55" y1="14" x2="23" y2="72" />
               <line x1="55" y1="14" x2="87" y2="72" />
               <path d="M 23 72 A 32 10 0 0 0 87 72" />
@@ -802,8 +838,8 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
               <line x1="55" y1="14" x2="55" y2="72" strokeDasharray="3.5 2.5" />
               <polyline points="55,65 61,65 61,72" strokeWidth="1.2" />
               <line x1="55" y1="72" x2="87" y2="72" strokeDasharray="3.5 2.5" />
-              <text x="45" y="50" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">h</text>
-              <text x="69" y="69" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
+              <text x="45" y="50" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">h</text>
+              <text x="69" y="69" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">r</text>
             </svg>
             <div className="mt-1.5 text-sm">
               <KatexFormula tex="V = \frac{1}{3}\pi r^2 h" />
@@ -812,7 +848,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
           {/* 5. Rectangular Pyramid */}
           <div className="col-span-2 sm:col-span-1 flex flex-col items-center text-center">
-            <svg viewBox="0 0 120 95" className="h-20 w-26 stroke-[#111113]" fill="none" strokeWidth="1.5">
+            <svg viewBox="0 0 120 95" className="h-20 w-26 stroke-[#D4D4D8]" fill="none" strokeWidth="1.5">
               <polyline points="16,74 76,74 100,56" />
               <polyline points="16,74 40,56 100,56" strokeDasharray="3.5 2.5" />
               <line x1="58" y1="14" x2="16" y2="74" />
@@ -821,9 +857,9 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
               <line x1="58" y1="14" x2="40" y2="56" strokeDasharray="3.5 2.5" />
               <line x1="58" y1="14" x2="58" y2="65" strokeDasharray="3.5 2.5" />
               <polyline points="58,59 64,59 64,65" strokeWidth="1.2" />
-              <text x="61" y="48" fill="#111113" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">h</text>
-              <text x="44" y="88" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
-              <text x="92" y="72" fill="#111113" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
+              <text x="61" y="48" fill="#E4E4E7" stroke="none" fontSize="12" fontFamily="serif" fontStyle="italic">h</text>
+              <text x="44" y="88" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">ℓ</text>
+              <text x="92" y="72" fill="#E4E4E7" stroke="none" fontSize="13" fontFamily="serif" fontStyle="italic">w</text>
             </svg>
             <div className="mt-1.5 text-sm">
               <KatexFormula tex="V = \frac{1}{3}\ell wh" />
@@ -832,7 +868,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         </div>
 
         {/* Bottom Section: Official Bluebook 3 Statements */}
-        <div className="mt-4 space-y-1.5 text-sm text-[#111113] leading-relaxed">
+        <div className="mt-4 space-y-1.5 text-sm text-[#D4D4D8] leading-relaxed">
           <p>The number of degrees of arc in a circle is 360.</p>
           <p>
             The number of radians of arc in a circle is{' '}
