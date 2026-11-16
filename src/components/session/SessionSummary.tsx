@@ -358,10 +358,10 @@ export const SessionSummary: React.FC = () => {
                   soundEngine.play('click');
                   setModuleFilterId('all');
                 }}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
                   moduleFilterId === 'all'
-                    ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                    : 'border border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
+                    ? 'border-transparent bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                    : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
                 }`}
               >
                 All ({totalQuestions})
@@ -374,10 +374,10 @@ export const SessionSummary: React.FC = () => {
                     soundEngine.play('click');
                     setModuleFilterId(mod.id);
                   }}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
                     moduleFilterId === mod.id
-                      ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                      : 'border border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
+                      ? 'border-transparent bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                      : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
                   }`}
                 >
                   {mod.shortLabel}

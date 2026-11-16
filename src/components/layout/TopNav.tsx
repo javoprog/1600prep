@@ -29,7 +29,7 @@ export const TopNav: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
-      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2.5 px-4 py-3 sm:h-16 sm:flex-nowrap sm:py-0 sm:px-6">
+      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:py-0 sm:px-6">
         {/* Editorial Brand Mark & Wordmark */}
         <Link
           href="/"

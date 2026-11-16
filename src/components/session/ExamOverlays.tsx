@@ -17,6 +17,71 @@ import { Button3D } from '@/components/ui/Button3D';
 import { formatDuration } from '@/utils/formatTime';
 import { soundEngine } from '@/services/sound/soundEngine';
 
+interface QuestionTileButtonProps {
+  questionId: string;
+  index: number;
+  state?: SessionQuestionState;
+  isCurrent?: boolean;
+  isFlagged?: boolean;
+  isReviewMode?: boolean;
+  onSelect: (index: number) => void;
+}
+
+const QuestionTileButton: React.FC<QuestionTileButtonProps> = ({
+  questionId,
+  index,
+  state,
+  isCurrent = false,
+  isFlagged = false,
+  isReviewMode = false,
+  onSelect,
+}) => {
+  const isAnswered = Boolean(state?.draftAnswer.trim() || state?.submittedAnswer);
+
+  let tileClass =
+    'border-[#29292E] bg-[#0A0A0B] text-[#71717A] hover:border-[#3F3F46] hover:text-[#F5F5F5]';
+
+  if (isReviewMode && state?.isSubmitted) {
+    tileClass = state.isCorrect
+      ? 'border-emerald-500/45 bg-emerald-500/12 text-emerald-300 hover:border-emerald-400'
+      : 'border-red-500/45 bg-red-500/12 text-red-300 hover:border-red-400';
+  } else if (isAnswered) {
+    tileClass =
+      'border-[#52525B] bg-[#27272A] text-[#F5F5F5] hover:border-[#71717A]';
+  }
+
+  if (isCurrent) {
+    tileClass = isReviewMode
+      ? `${tileClass} border-2 !border-[#69ff00] font-semibold`
+      : `border-2 !border-[#69ff00] ${
+          isAnswered ? 'bg-[#27272A]' : 'bg-[#18181B]'
+        } text-[#F5F5F5] font-semibold`;
+  }
+
+  return (
+    <button
+      key={questionId}
+      type="button"
+      onClick={() => {
+        soundEngine.play('click');
+        onSelect(index);
+      }}
+      title={`Question ${index + 1}${isAnswered ? ' (Answered)' : ' (Unanswered)'}${isFlagged ? ' • Flagged' : ''}`}
+      className={`relative flex h-9 w-9 items-center justify-center rounded-full border font-mono text-xs tabular-nums transition-colors cursor-pointer ${tileClass}`}
+    >
+      <span>{index + 1}</span>
+      {isFlagged && (
+        <span
+          className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#18181B]"
+          aria-label="Flagged"
+        >
+          <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+        </span>
+      )}
+    </button>
+  );
+};
+
 interface ExamPauseScreenProps {
   moduleLabel: string;
   timeRemainingMs: number;
@@ -29,35 +94,46 @@ export const ExamPauseScreen: React.FC<ExamPauseScreenProps> = ({
   onResume,
 }) => (
   <div className="flex flex-1 items-center justify-center px-4 py-16 animate-page-fade">
-    <div className="w-full max-w-md rounded-2xl border border-[#29292E] bg-[#111113] p-7 sm:p-8 text-center shadow-[0_24px_60px_rgba(0,0,0,0.6)]">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#29292E] bg-[#18181B] text-[#F5F5F5]">
-        <Pause className="h-5 w-5" />
-      </div>
-      <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
-        Practice Paused
-      </h2>
-      <p className="mt-1.5 text-xs text-[#A1A1AA]">
-        {moduleLabel} • Content is hidden while paused
-      </p>
-
-      <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-4 py-2 font-mono text-sm font-medium tabular-nums text-[#F5F5F5]">
-        <Clock className="h-4 w-4 text-[#71717A]" />
-        <span>{formatDuration(timeRemainingMs)} remaining</span>
+    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)]">
+      <div className="flex items-center justify-between border-b border-[#29292E] bg-[#18181B] px-5 py-3">
+        <span className="text-xs font-semibold text-[#F5F5F5]">
+          {moduleLabel}
+        </span>
+        <span className="rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-xs font-medium text-[#A1A1AA]">
+          Paused
+        </span>
       </div>
 
-      <div className="mt-7 flex justify-center">
-        <Button3D
-          variant="primary"
-          size="lg"
-          onClick={() => {
-            soundEngine.play('select');
-            onResume();
-          }}
-          className="px-7"
-        >
-          <Play className="h-4 w-4" />
-          <span>Resume Practice</span>
-        </Button3D>
+      <div className="p-7 sm:p-8 text-center">
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[#29292E] bg-[#18181B] text-[#F5F5F5]">
+          <Pause className="h-4.5 w-4.5" />
+        </div>
+        <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
+          Practice Paused
+        </h2>
+        <p className="mt-1.5 text-xs text-[#A1A1AA]">
+          Questions are hidden while the countdown timer is paused.
+        </p>
+
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-4 py-2 font-mono text-sm font-medium tabular-nums text-[#F5F5F5]">
+          <Clock className="h-3.5 w-3.5 text-[#71717A]" />
+          <span>{formatDuration(timeRemainingMs)} remaining</span>
+        </div>
+
+        <div className="mt-7 flex justify-center">
+          <Button3D
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              soundEngine.play('select');
+              onResume();
+            }}
+            className="px-7"
+          >
+            <Play className="h-4 w-4" />
+            <span>Resume Practice</span>
+          </Button3D>
+        </div>
       </div>
     </div>
   </div>
@@ -73,39 +149,47 @@ export const ExamBreakScreen: React.FC<ExamBreakScreenProps> = ({
   onStartMathSection,
 }) => (
   <div className="flex flex-1 items-center justify-center px-4 py-16 animate-page-fade">
-    <div className="w-full max-w-lg rounded-2xl border border-[#29292E] bg-[#111113] p-8 text-center shadow-[0_24px_60px_rgba(0,0,0,0.6)]">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#69ff00]/30 bg-[#69ff00]/10 text-[#69ff00]">
-        <Coffee className="h-5 w-5" />
-      </div>
-      <p className="mt-4 text-xs font-medium text-[#A1A1AA]">
-        Section 1 Completed
-      </p>
-      <h2 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5]">
-        Take a Break
-      </h2>
-      <p className="mt-2 text-sm text-[#A1A1AA] leading-relaxed">
-        You have completed Reading &amp; Writing. Take up to 10 minutes before
-        starting Math Module 1, or begin whenever you are ready.
-      </p>
-
-      <div className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-[#29292E] bg-[#0A0A0B] px-5 py-2.5 font-mono text-xl font-medium tabular-nums text-[#F5F5F5]">
-        <Clock className="h-4 w-4 text-[#69ff00]" />
-        <span>{formatDuration(breakTimeRemainingMs)}</span>
+    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)]">
+      <div className="flex items-center justify-between border-b border-[#29292E] bg-[#18181B] px-5 py-3">
+        <span className="text-xs font-semibold text-[#F5F5F5]">
+          Section Intermission
+        </span>
+        <span className="rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-xs font-medium text-[#A1A1AA]">
+          Section 1 Complete
+        </span>
       </div>
 
-      <div className="mt-7 flex justify-center">
-        <Button3D
-          variant="primary"
-          size="lg"
-          onClick={() => {
-            soundEngine.play('select');
-            onStartMathSection();
-          }}
-          className="px-7"
-        >
-          <span>Start Math Section</span>
-          <ArrowRight className="h-4 w-4" />
-        </Button3D>
+      <div className="p-7 sm:p-8 text-center">
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[#69ff00]/35 bg-[#69ff00]/10 text-[#69ff00]">
+          <Coffee className="h-4.5 w-4.5" />
+        </div>
+        <h2 className="mt-4 font-editorial text-2xl sm:text-3xl text-[#F5F5F5]">
+          Take a Break
+        </h2>
+        <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
+          You have finished Reading &amp; Writing. Take up to 10 minutes before
+          Math Module 1 begins, or continue whenever ready.
+        </p>
+
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-5 py-2 font-mono text-lg font-medium tabular-nums text-[#F5F5F5]">
+          <Clock className="h-4 w-4 text-[#69ff00]" />
+          <span>{formatDuration(breakTimeRemainingMs)}</span>
+        </div>
+
+        <div className="mt-7 flex justify-center">
+          <Button3D
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              soundEngine.play('select');
+              onStartMathSection();
+            }}
+            className="px-7"
+          >
+            <span>Start Math Section</span>
+            <ArrowRight className="h-4 w-4" />
+          </Button3D>
+        </div>
       </div>
     </div>
   </div>
@@ -142,32 +226,28 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
   ).length;
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6 animate-content-in">
-      <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-6 sm:p-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1F1F23] pb-5">
-          <div>
-            <p className="text-xs font-medium text-[#A1A1AA]">
-              {activeModule.label}
-            </p>
-            <h2 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5]">
-              Check Your Work
-            </h2>
-          </div>
+    <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6 animate-content-in">
+      <div className="overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.65)]">
+        {/* Consistent Window Header Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-5 py-3.5 sm:px-6">
+          <span className="text-xs font-semibold text-[#F5F5F5]">
+            {activeModule.label}
+          </span>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-[#29292E] bg-[#0A0A0B] px-3 py-1 text-[#A1A1AA]">
-              <strong className="font-semibold text-[#F5F5F5] tabular-nums">
+            <span className="rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-[#A1A1AA] tabular-nums">
+              <strong className="font-medium text-[#F5F5F5]">
                 {answeredCount}
               </strong>{' '}
               answered
             </span>
             {unansweredCount > 0 && (
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-300 tabular-nums">
+              <span className="rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-[#A1A1AA] tabular-nums">
                 {unansweredCount} unanswered
               </span>
             )}
             {flaggedInModCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-[#3F3F46] bg-[#18181B] px-3 py-1 text-[#F5F5F5] tabular-nums">
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-0.5 text-amber-300 tabular-nums">
                 <Flag className="h-3 w-3 fill-amber-400 text-amber-400" />
                 {flaggedInModCount} flagged
               </span>
@@ -175,44 +255,47 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-[#A1A1AA] leading-relaxed">
-          Select any question number below to review or edit your answer. Once
-          you submit this module, you cannot return to change answers.
-        </p>
+        {/* Review Body */}
+        <div className="p-6 sm:p-7">
+          <h2 className="font-editorial text-2xl text-[#F5F5F5]">
+            Check Your Work
+          </h2>
+          <p className="mt-1.5 text-xs text-[#A1A1AA] leading-relaxed">
+            Click any question number below to review or edit your answer before
+            locking this module.
+          </p>
 
-        {/* Question Status Tile Grid */}
-        <div className="mt-6 grid grid-cols-6 sm:grid-cols-9 gap-2.5">
-          {activeModule.questionIds.map((qId, idx) => {
-            const isAnswered = Boolean(questionStates[qId]?.draftAnswer.trim());
-            const isFlagged = flaggedSet.has(qId);
-
-            return (
-              <button
+          <div className="mt-6 grid grid-cols-6 sm:grid-cols-9 justify-items-center gap-3">
+            {activeModule.questionIds.map((qId, idx) => (
+              <QuestionTileButton
                 key={qId}
-                type="button"
-                onClick={() => {
-                  soundEngine.play('click');
-                  onJumpToQuestion(idx);
-                }}
-                className={`relative flex h-10 w-full items-center justify-center rounded-full border font-mono text-xs font-medium transition-all cursor-pointer ${
-                  isAnswered
-                    ? 'border-[#3F3F46] bg-[#18181B] text-[#F5F5F5] hover:border-[#69ff00]/75'
-                    : 'border-dashed border-[#29292E] bg-[#0A0A0B] text-[#71717A] hover:border-[#52525B] hover:text-[#F5F5F5]'
-                }`}
-                title={`Question ${idx + 1}${isAnswered ? ' (Answered)' : ' (Unanswered)'}${isFlagged ? ' • Flagged' : ''}`}
-              >
-                <span>{idx + 1}</span>
-                {isFlagged && (
-                  <span className="absolute -top-1 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#141417]">
-                    <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                questionId={qId}
+                index={idx}
+                state={questionStates[qId]}
+                isFlagged={flaggedSet.has(qId)}
+                onSelect={onJumpToQuestion}
+              />
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-[#71717A]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full border border-[#52525B] bg-[#27272A]" />
+              <span>Answered</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full border border-[#29292E] bg-[#0A0A0B]" />
+              <span>Unanswered</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Flag className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span>Flagged</span>
+            </span>
+          </div>
         </div>
 
-        <div className="mt-8 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 border-t border-[#1F1F23] pt-6">
+        {/* Consistent Action Footer Band */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 border-t border-[#1F1F23] bg-[#141417] px-5 py-4 sm:px-6">
           <Button3D
             variant="secondary"
             size="md"
@@ -227,10 +310,10 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
 
           <Button3D
             variant="primary"
-            size="lg"
+            size="md"
             disabled={isTransitioning}
             onClick={onSubmitModule}
-            className="px-7"
+            className="px-6"
           >
             {isTransitioning ? (
               <>
@@ -240,7 +323,9 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
             ) : (
               <>
                 <span>
-                  {isFinalModule ? 'Finish & View Score' : 'Submit Module & Continue'}
+                  {isFinalModule
+                    ? 'Finish & View Score'
+                    : 'Submit Module & Continue'}
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </>
@@ -259,7 +344,9 @@ interface ExamQuestionGridPopoverProps {
   questionStates: Record<string, SessionQuestionState>;
   flaggedQuestionIds: string[];
   isReviewMode?: boolean;
+  modules?: ExamModuleState[];
   onSelectIndex: (idx: number) => void;
+  onGoToCheckWork?: () => void;
   onClose: () => void;
   moduleLabel?: string;
 }
@@ -271,96 +358,166 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
   questionStates,
   flaggedQuestionIds,
   isReviewMode = false,
+  modules,
   onSelectIndex,
+  onGoToCheckWork,
   onClose,
   moduleLabel,
 }) => {
   if (!isOpen) return null;
   const flaggedSet = new Set(flaggedQuestionIds);
 
+  const indexById = new Map<string, number>();
+  questionIds.forEach((id, idx) => indexById.set(id, idx));
+
+  const answeredCount = questionIds.filter((qId) =>
+    Boolean(questionStates[qId]?.draftAnswer.trim() || questionStates[qId]?.submittedAnswer)
+  ).length;
+  const flaggedCount = questionIds.filter((qId) => flaggedSet.has(qId)).length;
+
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-[2px] p-4 animate-page-fade"
+      className="fixed inset-0 z-40 flex items-end justify-center sm:justify-start sm:pl-6 sm:pb-[74px] bg-black/45 p-3 pb-[74px] animate-page-fade"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-label="Question navigator"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-[#3F3F46] bg-[#141417] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.8)] animate-content-in"
+        className="w-full max-w-[376px] overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
       >
-        <div className="flex items-center justify-between border-b border-[#29292E] pb-3">
-          <div className="flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4 text-[#71717A]" />
-            <span className="text-sm font-semibold text-[#F5F5F5]">
+        {/* Window Header Band */}
+        <div className="flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-4 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-[#71717A]" />
+            <span className="text-xs font-semibold text-[#F5F5F5] truncate">
               {moduleLabel || 'Questions'}
             </span>
           </div>
           <button
             type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            onClick={() => {
+              soundEngine.play('click');
+              onClose();
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            title="Close question navigator"
             aria-label="Close question navigator"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mt-4 max-h-72 overflow-y-auto grid grid-cols-6 sm:grid-cols-7 gap-2 pr-1">
-          {questionIds.map((qId, idx) => {
-            const st = questionStates[qId];
-            const isCurrent = idx === currentIndex;
-            const isFlagged = flaggedSet.has(qId);
-            const isAnswered = Boolean(st?.draftAnswer.trim() || st?.submittedAnswer);
-
-            let tileStyle =
-              'border-dashed border-[#3F3F46] bg-[#0A0A0B] text-[#71717A] hover:border-[#52525B] hover:text-[#F5F5F5]';
-            if (isReviewMode && st?.isSubmitted) {
-              tileStyle = st.isCorrect
-                ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300'
-                : 'border-red-500/45 bg-red-500/10 text-red-300';
-            } else if (isAnswered) {
-              tileStyle = 'border-[#29292E] bg-[#18181B] text-[#F5F5F5] hover:border-[#3F3F46]';
-            }
-
-            return (
-              <button
-                key={qId}
-                type="button"
-                onClick={() => {
-                  soundEngine.play('click');
-                  onSelectIndex(idx);
-                  onClose();
-                }}
-                className={`relative flex h-10 items-center justify-center rounded-full border font-mono text-xs font-medium transition-all cursor-pointer ${tileStyle} ${
-                  isCurrent ? 'ring-2 ring-[#69ff00] ring-offset-2 ring-offset-[#141417]' : ''
-                }`}
-              >
-                <span>{idx + 1}</span>
-                {isFlagged && (
-                  <span className="absolute -top-1 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#141417]">
-                    <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {/* Status Summary Subbar */}
+        <div className="flex items-center justify-between border-b border-[#1F1F23] bg-[#141417]/60 px-4 py-2 text-xs text-[#71717A] tabular-nums">
+          <span>
+            <strong className="font-medium text-[#F5F5F5]">{answeredCount}</strong> of{' '}
+            {questionIds.length} answered
+          </span>
+          {!isReviewMode && flaggedCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-amber-300">
+              <Flag className="h-3 w-3 fill-amber-400 text-amber-400" />
+              {flaggedCount} flagged
+            </span>
+          )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[#29292E] pt-3 text-xs text-[#71717A]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#18181B] border border-[#29292E]" />
-            <span>Answered</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#0A0A0B] border border-dashed border-[#3F3F46]" />
-            <span>Unanswered</span>
-          </span>
-          {!isReviewMode && (
+        {/* Question Circles Grid (Grouped by module when in full review mode) */}
+        <div className="max-h-72 overflow-y-auto px-4 py-4">
+          {isReviewMode && modules && modules.length > 1 ? (
+            <div className="space-y-4">
+              {modules.map((mod) => (
+                <div key={mod.id}>
+                  <div className="mb-2 text-xs font-medium text-[#71717A]">
+                    {mod.label}
+                  </div>
+                  <div className="grid grid-cols-7 justify-items-center gap-2">
+                    {mod.questionIds.map((qId) => {
+                      const globalIdx = indexById.get(qId) ?? 0;
+                      return (
+                        <QuestionTileButton
+                          key={qId}
+                          questionId={qId}
+                          index={globalIdx}
+                          state={questionStates[qId]}
+                          isCurrent={globalIdx === currentIndex}
+                          isFlagged={false}
+                          isReviewMode
+                          onSelect={(idx) => {
+                            onSelectIndex(idx);
+                            onClose();
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 justify-items-center gap-2">
+              {questionIds.map((qId, idx) => (
+                <QuestionTileButton
+                  key={qId}
+                  questionId={qId}
+                  index={idx}
+                  state={questionStates[qId]}
+                  isCurrent={idx === currentIndex}
+                  isFlagged={!isReviewMode && flaggedSet.has(qId)}
+                  isReviewMode={isReviewMode}
+                  onSelect={(targetIdx) => {
+                    onSelectIndex(targetIdx);
+                    onClose();
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Window Footer Band: Matching Circular Legend + Quick Action */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1F1F23] bg-[#141417] px-4 py-2.5 text-xs text-[#71717A]">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-1.5">
-              <Flag className="h-3 w-3 fill-amber-400 text-amber-400" />
-              <span>Flagged</span>
+              <span className="h-2.5 w-2.5 rounded-full border-2 border-[#69ff00] bg-[#18181B]" />
+              <span>Current</span>
             </span>
+            {isReviewMode ? (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full border border-emerald-500/45 bg-emerald-500/15" />
+                  <span>Correct</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full border border-red-500/45 bg-red-500/15" />
+                  <span>Missed</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full border border-[#52525B] bg-[#27272A]" />
+                  <span>Answered</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full border border-[#29292E] bg-[#0A0A0B]" />
+                  <span>Open</span>
+                </span>
+              </>
+            )}
+          </div>
+
+          {onGoToCheckWork && (
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.play('click');
+                onGoToCheckWork();
+              }}
+              className="text-xs font-medium text-[#F5F5F5] hover:text-[#69ff00] transition-colors cursor-pointer"
+            >
+              {isReviewMode ? 'Score Report →' : 'Check Work →'}
+            </button>
           )}
         </div>
       </div>
@@ -385,19 +542,20 @@ export const ExamExitModal: React.FC<ExamExitModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-page-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-page-fade"
       onClick={onContinue}
     >
       <div
         role="dialog"
         aria-label="Leave full practice"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl border border-[#29292E] bg-[#111113] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-editorial text-2xl text-[#F5F5F5]">
+        {/* Window Header Bar */}
+        <div className="flex items-center justify-between border-b border-[#29292E] bg-[#18181B] px-5 py-3">
+          <span className="text-xs font-semibold text-[#F5F5F5]">
             Leave Full Practice?
-          </h3>
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -405,52 +563,55 @@ export const ExamExitModal: React.FC<ExamExitModalProps> = ({
               onContinue();
             }}
             aria-label="Close modal"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#27272A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
-          Your module progress, answers, and remaining time are saved so you can
-          pick up where you left off.
-        </p>
-
-        <div className="mt-6 grid grid-cols-2 gap-2.5">
-          <Button3D
-            variant="secondary"
-            size="md"
-            onClick={() => {
-              soundEngine.play('click');
-              onSaveAndExit();
-            }}
-          >
-            <span>Save &amp; Exit</span>
-          </Button3D>
-
-          <Button3D
-            variant="primary"
-            size="md"
-            onClick={() => {
-              soundEngine.play('select');
-              onContinue();
-            }}
-          >
-            <span>Keep Practicing</span>
-          </Button3D>
+        {/* Body */}
+        <div className="p-5">
+          <p className="text-sm text-[#D4D4D8] leading-relaxed">
+            Your answers, flags, and remaining module timer are saved locally on
+            this device so you can resume anytime.
+          </p>
         </div>
 
-        <div className="mt-4 border-t border-[#1F1F23] pt-3.5 text-center">
-          <button
-            type="button"
+        {/* Balanced Action Footer Band */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#1F1F23] bg-[#141417] px-5 py-3.5">
+          <Button3D
+            variant="danger"
+            size="sm"
             onClick={() => {
               soundEngine.play('click');
               onDiscard();
             }}
-            className="text-xs font-medium text-red-400/85 hover:text-red-400 transition-colors cursor-pointer"
           >
-            Discard progress and exit
-          </button>
+            <span>Discard</span>
+          </Button3D>
+
+          <div className="flex items-center gap-2.5">
+            <Button3D
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                soundEngine.play('click');
+                onContinue();
+              }}
+            >
+              <span>Keep Practicing</span>
+            </Button3D>
+            <Button3D
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                soundEngine.play('select');
+                onSaveAndExit();
+              }}
+            >
+              <span>Save &amp; Exit</span>
+            </Button3D>
+          </div>
         </div>
       </div>
     </div>

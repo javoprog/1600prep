@@ -38,7 +38,7 @@ const EXAM_TRACK_OPTIONS: ReadonlyArray<{
     badge: '98 questions • 2h 14m',
     title: 'Full Test',
     description:
-      'Complete Digital SAT with adaptive Reading & Writing (2 × 32m), optional 10-minute break, and adaptive Math (2 × 35m).',
+      'Complete Digital SAT with adaptive Reading & Writing, an optional 10-minute break, and adaptive Math.',
     statsLeft: '4 modules + break',
     statsRight: 'Score 400–1600',
   },
@@ -47,7 +47,7 @@ const EXAM_TRACK_OPTIONS: ReadonlyArray<{
     badge: '54 questions • 64m',
     title: 'Only Reading & Writing Full Practice',
     description:
-      'Complete Reading & Writing section: 27-question Module 1 followed by an adaptive 27-question Module 2.',
+      '27-question Module 1 followed by an adaptive 27-question Module 2 across all four R&W domains.',
     statsLeft: '2 × 32m modules',
     statsRight: 'Score 200–800',
   },
@@ -56,7 +56,7 @@ const EXAM_TRACK_OPTIONS: ReadonlyArray<{
     badge: '44 questions • 70m',
     title: 'Only Math Full Practice',
     description:
-      'Complete Math section: 22-question Module 1 and adaptive 22-question Module 2 with Desmos and Reference Sheet.',
+      '22-question Module 1 and an adaptive 22-question Module 2 with Desmos Calculator and Reference Sheet.',
     statsLeft: '2 × 35m modules',
     statsRight: 'Score 200–800',
   },
@@ -67,36 +67,24 @@ const DIFFICULTY_OPTIONS: Array<{
   label: string;
   description: string;
   dotColor: string;
-  activeBorder: string;
-  activeBg: string;
-  badgeColors: string;
 }> = [
   {
     id: 'E',
     label: 'Easy',
     description: 'Foundational concepts & direct application',
     dotColor: 'bg-emerald-400',
-    activeBorder: 'border-emerald-500/50',
-    activeBg: 'bg-emerald-950/20',
-    badgeColors: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
   },
   {
     id: 'M',
     label: 'Medium',
     description: 'Standard Digital SAT exam complexity',
     dotColor: 'bg-white',
-    activeBorder: 'border-white/40',
-    activeBg: 'bg-white/[0.06]',
-    badgeColors: 'border-white/25 bg-white/10 text-white',
   },
   {
     id: 'H',
     label: 'Hard',
     description: 'Multi-step reasoning & upper score band',
     dotColor: 'bg-rose-400',
-    activeBorder: 'border-rose-500/50',
-    activeBg: 'bg-rose-950/20',
-    badgeColors: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
   },
 ];
 
@@ -452,7 +440,9 @@ export const PracticeWizard: React.FC = () => {
           )}
 
           <div>
-            <p className="text-xs font-medium text-white">Adaptive Digital SAT</p>
+            <p className="text-xs font-medium text-[#A1A1AA]">
+              Adaptive Digital SAT
+            </p>
             <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
               Choose your full practice mode
             </h1>
@@ -663,7 +653,7 @@ export const PracticeWizard: React.FC = () => {
           }`}
         >
           <div>
-            <p className="text-xs font-medium text-white">Step 1</p>
+            <p className="text-xs font-medium text-[#A1A1AA]">Step 1</p>
             <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
               What do you want to practice?
             </h1>
@@ -774,7 +764,7 @@ export const PracticeWizard: React.FC = () => {
       {step === 2 && (
         <div className="space-y-8 animate-wizard-forward">
           <div>
-            <p className="text-xs font-medium text-white">
+            <p className="text-xs font-medium text-[#A1A1AA]">
               Step 2 • {subject === 'rw' ? 'Reading & Writing' : 'Math'}
             </p>
             <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">

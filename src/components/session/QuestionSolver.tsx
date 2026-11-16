@@ -620,10 +620,10 @@ export const QuestionSolver: React.FC = () => {
                   soundEngine.play('click');
                   togglePauseSession();
                 }}
-                className={`ml-0.5 inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors cursor-pointer ${
+                className={`ml-0.5 inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs transition-colors cursor-pointer ${
                   activeExam?.isExamPaused
-                    ? 'border-[#69ff00]/50 bg-[#69ff00]/10 text-[#69ff00]'
-                    : 'border-[#29292E] bg-[#141417] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
+                    ? 'bg-[#18181B] text-[#69ff00]'
+                    : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
                 }`}
                 title={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
                 aria-label={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
@@ -1512,8 +1512,17 @@ export const QuestionSolver: React.FC = () => {
         questionStates={activeSession.questionStates}
         flaggedQuestionIds={activeExam?.flaggedQuestionIds || []}
         isReviewMode={isExamReview}
-        moduleLabel={isExamReview ? 'All Exam Questions' : activeModule?.label}
+        modules={isExamReview ? activeExam?.modules : undefined}
+        moduleLabel={isExamReview ? 'All Questions' : activeModule?.label}
         onSelectIndex={goToQuestionIndex}
+        onGoToCheckWork={() => {
+          setIsQuestionGridOpen(false);
+          if (isExamReview) {
+            setIsSessionSummaryView(true);
+          } else {
+            setExamPhase('module-review');
+          }
+        }}
         onClose={() => setIsQuestionGridOpen(false)}
       />
 
