@@ -3,7 +3,6 @@
 import React from 'react';
 import {
   ArrowRight,
-  Check,
   Clock,
   Coffee,
   Flag,
@@ -35,10 +34,10 @@ export const ExamPauseScreen: React.FC<ExamPauseScreenProps> = ({
         <Pause className="h-5 w-5" />
       </div>
       <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
-        Exam Paused
+        Practice Paused
       </h2>
       <p className="mt-1.5 text-xs text-[#A1A1AA]">
-        {moduleLabel} • Question hidden while timer is paused
+        {moduleLabel} • Content is hidden while paused
       </p>
 
       <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-4 py-2 font-mono text-sm font-medium tabular-nums text-[#F5F5F5]">
@@ -57,7 +56,7 @@ export const ExamPauseScreen: React.FC<ExamPauseScreenProps> = ({
           className="px-7"
         >
           <Play className="h-4 w-4" />
-          <span>Resume Exam</span>
+          <span>Resume Practice</span>
         </Button3D>
       </div>
     </div>
@@ -195,16 +194,18 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
                   soundEngine.play('click');
                   onJumpToQuestion(idx);
                 }}
-                className={`relative flex h-11 items-center justify-center rounded-xl border font-mono text-sm font-medium transition-all cursor-pointer ${
+                className={`relative flex h-10 w-full items-center justify-center rounded-full border font-mono text-xs font-medium transition-all cursor-pointer ${
                   isAnswered
-                    ? 'border-[#69ff00]/55 bg-[#18181B] text-[#F5F5F5] hover:border-[#69ff00]'
-                    : 'border-dashed border-[#3F3F46] bg-[#0A0A0B] text-[#71717A] hover:border-[#52525B] hover:text-[#F5F5F5]'
+                    ? 'border-[#3F3F46] bg-[#18181B] text-[#F5F5F5] hover:border-[#69ff00]/75'
+                    : 'border-dashed border-[#29292E] bg-[#0A0A0B] text-[#71717A] hover:border-[#52525B] hover:text-[#F5F5F5]'
                 }`}
                 title={`Question ${idx + 1}${isAnswered ? ' (Answered)' : ' (Unanswered)'}${isFlagged ? ' • Flagged' : ''}`}
               >
                 <span>{idx + 1}</span>
                 {isFlagged && (
-                  <Flag className="absolute top-1 right-1 h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                  <span className="absolute -top-1 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#141417]">
+                    <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                  </span>
                 )}
               </button>
             );
@@ -239,7 +240,7 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
             ) : (
               <>
                 <span>
-                  {isFinalModule ? 'Finish Exam & View Score' : 'Submit Module & Continue'}
+                  {isFinalModule ? 'Finish & View Score' : 'Submit Module & Continue'}
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </>
@@ -331,13 +332,15 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
                   onSelectIndex(idx);
                   onClose();
                 }}
-                className={`relative flex h-10 items-center justify-center rounded-xl border font-mono text-xs font-medium transition-all cursor-pointer ${tileStyle} ${
+                className={`relative flex h-10 items-center justify-center rounded-full border font-mono text-xs font-medium transition-all cursor-pointer ${tileStyle} ${
                   isCurrent ? 'ring-2 ring-[#69ff00] ring-offset-2 ring-offset-[#141417]' : ''
                 }`}
               >
                 <span>{idx + 1}</span>
                 {isFlagged && (
-                  <Flag className="absolute top-1 right-1 h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                  <span className="absolute -top-1 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#141417]">
+                    <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                  </span>
                 )}
               </button>
             );
@@ -387,54 +390,67 @@ export const ExamExitModal: React.FC<ExamExitModalProps> = ({
     >
       <div
         role="dialog"
-        aria-label="Leave full exam"
+        aria-label="Leave full practice"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-[#3F3F46] bg-[#141417] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
+        className="w-full max-w-sm rounded-2xl border border-[#29292E] bg-[#111113] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
       >
-        <h3 className="font-editorial text-2xl text-[#F5F5F5]">
-          Leave Full Practice?
-        </h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-editorial text-2xl text-[#F5F5F5]">
+            Leave Full Practice?
+          </h3>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('click');
+              onContinue();
+            }}
+            aria-label="Close modal"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
         <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
-          You can save your current module, answers, and remaining timer to
-          resume later from the home screen, or discard this exam run.
+          Your module progress, answers, and remaining time are saved so you can
+          pick up where you left off.
         </p>
 
-        <div className="mt-6 flex flex-col gap-2.5">
+        <div className="mt-6 grid grid-cols-2 gap-2.5">
+          <Button3D
+            variant="secondary"
+            size="md"
+            onClick={() => {
+              soundEngine.play('click');
+              onSaveAndExit();
+            }}
+          >
+            <span>Save &amp; Exit</span>
+          </Button3D>
+
           <Button3D
             variant="primary"
             size="md"
             onClick={() => {
               soundEngine.play('select');
-              onSaveAndExit();
+              onContinue();
             }}
-            className="w-full"
           >
-            <Check className="h-4 w-4" />
-            <span>Save Progress &amp; Exit</span>
+            <span>Keep Practicing</span>
           </Button3D>
+        </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <Button3D
-              variant="secondary"
-              size="md"
-              onClick={() => {
-                soundEngine.play('click');
-                onDiscard();
-              }}
-            >
-              <span>Discard Exam</span>
-            </Button3D>
-            <Button3D
-              variant="ghost"
-              size="md"
-              onClick={() => {
-                soundEngine.play('click');
-                onContinue();
-              }}
-            >
-              <span>Keep Testing</span>
-            </Button3D>
-          </div>
+        <div className="mt-4 border-t border-[#1F1F23] pt-3.5 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('click');
+              onDiscard();
+            }}
+            className="text-xs font-medium text-red-400/85 hover:text-red-400 transition-colors cursor-pointer"
+          >
+            Discard progress and exit
+          </button>
         </div>
       </div>
     </div>

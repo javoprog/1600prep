@@ -13,19 +13,23 @@ export const TopNav: React.FC = () => {
   const {
     settings,
     updateSettings,
+    homeTab,
+    setHomeTab,
     activeSession,
     isSessionSummaryView,
     closeActiveSession,
   } = useApp();
 
-  // Hide the workspace navigation bar during an active exam session so the exam screen has its own dedicated environment
+  // Hide the workspace navigation bar during an active exam/practice session
   if (pathname === '/' && activeSession && !isSessionSummaryView) {
     return null;
   }
 
+  const showHomeTabs = pathname === '/' && !activeSession;
+
   return (
-    <header className="sticky top-0 z-40 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
+      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2.5 px-4 py-3 sm:h-16 sm:flex-nowrap sm:py-0 sm:px-6">
         {/* Editorial Brand Mark & Wordmark */}
         <Link
           href="/"
@@ -35,13 +39,57 @@ export const TopNav: React.FC = () => {
               closeActiveSession();
             }
           }}
-          className="group flex items-center focus:outline-none"
+          className="order-1 group flex items-center focus:outline-none"
         >
           <BrandLogo />
         </Link>
 
+        {/* Center Mode Switcher Tabs: Topic Practice vs Full Practice */}
+        {showHomeTabs && (
+          <div className="order-3 flex w-full justify-center sm:order-2 sm:w-auto sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+            <div
+              role="tablist"
+              aria-label="Practice mode"
+              className="inline-flex w-full sm:w-auto items-center rounded-full border border-[#29292E] bg-[#111113] p-1"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={homeTab === 'topic'}
+                onClick={() => {
+                  soundEngine.play('click');
+                  setHomeTab('topic');
+                }}
+                className={`flex-1 sm:flex-initial rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  homeTab === 'topic'
+                    ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+              >
+                Topic Practice
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={homeTab === 'full'}
+                onClick={() => {
+                  soundEngine.play('click');
+                  setHomeTab('full');
+                }}
+                className={`flex-1 sm:flex-initial rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  homeTab === 'full'
+                    ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                }`}
+              >
+                Full Practice
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Right Controls: Sound Toggle */}
-        <div className="flex items-center gap-1.5">
+        <div className="order-2 sm:order-3 flex items-center gap-1.5">
           <button
             type="button"
             aria-label={

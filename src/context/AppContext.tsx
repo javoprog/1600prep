@@ -13,6 +13,7 @@ import {
   Attempt,
   ExamPhase,
   ExamTrack,
+  HomePracticeTab,
   PracticeFilters,
   PracticeMode,
   Question,
@@ -66,6 +67,10 @@ interface AppContextValue {
   // User Preferences (stored locally on device)
   settings: UserSettings;
   updateSettings: (partial: Partial<UserSettings>) => void;
+
+  // Workspace Navigation
+  homeTab: HomePracticeTab;
+  setHomeTab: (tab: HomePracticeTab) => void;
 
   // Active Session & Stopwatch
   activeSession: Session | null;
@@ -123,6 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
 
+  const [homeTab, setHomeTab] = useState<HomePracticeTab>('topic');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [savedResumeExam, setSavedResumeExam] = useState<Session | null>(null);
   const [isTransitioningExamModule, setIsTransitioningExamModule] =
@@ -144,6 +150,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       .then((saved) => {
         if (saved && !activeSessionRef.current) {
           setSavedResumeExam(saved);
+          setHomeTab('full');
         }
       })
       .catch(() => {});
@@ -407,8 +414,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const titleMap: Record<ExamTrack, string> = {
         full: 'Full Digital SAT Practice',
-        rw: 'Reading & Writing Full Practice',
-        math: 'Math Full Practice',
+        rw: 'Only Reading & Writing Full Practice',
+        math: 'Only Math Full Practice',
       };
 
       const newSession: Session = {
@@ -492,6 +499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     await saveActiveExamSession(pausedSnapshot);
     setSavedResumeExam(pausedSnapshot);
+    setHomeTab('full');
     setActiveSession(null);
     setIsSessionSummaryView(false);
   }, []);
@@ -1023,6 +1031,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      homeTab,
+      setHomeTab,
       activeSession,
       savedResumeExam,
       isTransitioningExamModule,
@@ -1056,6 +1066,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      homeTab,
+      setHomeTab,
       activeSession,
       savedResumeExam,
       isTransitioningExamModule,

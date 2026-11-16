@@ -149,10 +149,10 @@ export const SessionSummary: React.FC = () => {
           {isExamSummary
             ? `Score Report • ${
                 examReport?.track === 'full'
-                  ? 'Full Digital SAT'
+                  ? 'Full Digital SAT Practice'
                   : examReport?.track === 'rw'
-                  ? 'Reading & Writing Full Practice'
-                  : 'Math Full Practice'
+                  ? 'Only Reading & Writing Full Practice'
+                  : 'Only Math Full Practice'
               }`
             : `Session completed • ${
                 activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'

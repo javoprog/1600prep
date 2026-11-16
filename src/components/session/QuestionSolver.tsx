@@ -474,7 +474,7 @@ export const QuestionSolver: React.FC = () => {
   const diffBadge = getDifficultyBadgeInfo(currentMeta?.difficulty);
   const currentHighlights = highlightMap[currentQuestionId] || [];
   const footerBtnClass = 'h-9 whitespace-nowrap sm:h-10 sm:px-4 sm:py-2 sm:text-sm';
-  const footerNavBtnClass = `${footerBtnClass} min-w-[90px] sm:min-w-[108px]`;
+  const footerNavBtnClass = `${footerBtnClass} min-w-[84px] sm:min-w-[108px]`;
 
   const eliminatedForCurrent = eliminatedMap[currentQuestionId] || [];
 
@@ -625,8 +625,8 @@ export const QuestionSolver: React.FC = () => {
                     ? 'border-[#69ff00]/50 bg-[#69ff00]/10 text-[#69ff00]'
                     : 'border-[#29292E] bg-[#141417] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
                 }`}
-                title={activeExam?.isExamPaused ? 'Resume exam' : 'Pause exam'}
-                aria-label={activeExam?.isExamPaused ? 'Resume exam' : 'Pause exam'}
+                title={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
+                aria-label={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
               >
                 {activeExam?.isExamPaused ? (
                   <>
@@ -1398,14 +1398,15 @@ export const QuestionSolver: React.FC = () => {
                 </span>
               </Button3D>
             ) : isExamReview ? (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <Button3D
                   variant="secondary"
                   size="sm"
                   className={`${footerBtnClass} shrink-0`}
                   onClick={() => setIsSessionSummaryView(true)}
                 >
-                  <span>Score Report</span>
+                  <span className="hidden sm:inline">Score Report</span>
+                  <span className="sm:hidden">Report</span>
                 </Button3D>
                 <Button3D
                   variant="secondary"

@@ -20,6 +20,7 @@ export type PracticeMode =
   | 'retry'
   | 'exam';
 
+export type HomePracticeTab = 'topic' | 'full';
 export type ExamTrack = 'full' | 'rw' | 'math';
 export type ExamPhase = 'testing' | 'module-review' | 'break' | 'completed';
 export type AdaptiveTier = 'baseline' | 'easy' | 'hard';
