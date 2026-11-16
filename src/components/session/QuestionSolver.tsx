@@ -13,8 +13,12 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Flag,
+  LayoutGrid,
   Loader2,
+  Pause,
   PenTool,
+  Play,
   RefreshCw,
   Share2,
   Undo2,
@@ -44,6 +48,13 @@ import {
   ScratchpadOverlay,
   ScratchpadStroke,
 } from '@/components/session/ScratchpadOverlay';
+import {
+  ExamBreakScreen,
+  ExamExitModal,
+  ExamModuleReviewScreen,
+  ExamPauseScreen,
+  ExamQuestionGridPopover,
+} from '@/components/session/ExamOverlays';
 import { usePracticeShortcuts } from '@/hooks/usePracticeShortcuts';
 import {
   formatDuration,
@@ -55,11 +66,19 @@ import { soundEngine } from '@/services/sound/soundEngine';
 export const QuestionSolver: React.FC = () => {
   const {
     activeSession,
+    isTransitioningExamModule,
     setDraftAnswer,
     submitAnswer,
     goToQuestionIndex,
     completeSession,
     closeActiveSession,
+    exitAndSaveExam,
+    discardSavedExam,
+    togglePauseSession,
+    toggleFlagQuestion,
+    setExamPhase,
+    skipExamBreak,
+    lockCurrentModuleAndAdvance,
     syncSessionTime,
     setIsSessionSummaryView,
     metaMap,
@@ -83,6 +102,8 @@ export const QuestionSolver: React.FC = () => {
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
   const [isTimerHidden, setIsTimerHidden] = useState<boolean>(false);
   const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
+  const [isQuestionGridOpen, setIsQuestionGridOpen] = useState<boolean>(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState<boolean>(false);
   const footerRef = useRef<HTMLElement | null>(null);
   const loadRequestIdRef = useRef<number>(0);
   const questionStatesRef = useRef(activeSession?.questionStates);
@@ -139,6 +160,14 @@ export const QuestionSolver: React.FC = () => {
   }, [activeSession, currentQuestionId]);
 
   const isCompletedSession = Boolean(activeSession?.completedAt);
+  const isExamMode = activeSession?.mode === 'exam' && Boolean(activeSession?.exam);
+  const isLiveExam = isExamMode && !isCompletedSession;
+  const isExamReview = isExamMode && isCompletedSession;
+  const activeExam = isExamMode ? activeSession?.exam : undefined;
+  const activeModule = activeExam
+    ? activeExam.modules[activeExam.currentModuleIndex]
+    : undefined;
+  const isTestingPhase = !isLiveExam || activeExam?.phase === 'testing';
 
   // Load current question details with stale-response guard for fast navigation
   const loadQuestion = useCallback(async (qId: string) => {
@@ -175,14 +204,17 @@ export const QuestionSolver: React.FC = () => {
     }
   }, [currentQuestionId, loadQuestion]);
 
-  // Per-question Wall-Clock Stopwatch (resets after each question)
+  // Wall-Clock Timer: Question stopwatch (Topic Practice) or Module/Break countdown (Full Exam)
   useEffect(() => {
-    if (
-      !activeSession ||
-      isCompletedSession ||
-      isLoadingQuestion ||
-      currentQuestionState?.isSubmitted
-    ) {
+    if (!activeSession || isCompletedSession) {
+      return;
+    }
+
+    if (isLiveExam) {
+      if (activeExam?.isExamPaused || activeExam?.phase === 'completed') {
+        return;
+      }
+    } else if (isLoadingQuestion || currentQuestionState?.isSubmitted) {
       return;
     }
 
@@ -193,8 +225,12 @@ export const QuestionSolver: React.FC = () => {
       const delta = now - lastTickRef.current;
       if (delta > 0) {
         lastTickRef.current = now;
-        setQuestionTimerMs((prev) => prev + delta);
-        syncSessionTime(delta, currentQuestionId, delta);
+        if (!isLiveExam || activeExam?.phase === 'testing') {
+          setQuestionTimerMs((prev) => prev + delta);
+        }
+        const trackedQId =
+          isLiveExam && activeExam?.phase !== 'testing' ? null : currentQuestionId;
+        syncSessionTime(delta, trackedQId, delta);
       }
     }, 250);
 
@@ -204,8 +240,12 @@ export const QuestionSolver: React.FC = () => {
         const delta = now - lastTickRef.current;
         if (delta > 0) {
           lastTickRef.current = now;
-          setQuestionTimerMs((prev) => prev + delta);
-          syncSessionTime(delta, currentQuestionId, delta);
+          if (!isLiveExam || activeExam?.phase === 'testing') {
+            setQuestionTimerMs((prev) => prev + delta);
+          }
+          const trackedQId =
+            isLiveExam && activeExam?.phase !== 'testing' ? null : currentQuestionId;
+          syncSessionTime(delta, trackedQId, delta);
         }
       } else {
         lastTickRef.current = now;
@@ -220,10 +260,39 @@ export const QuestionSolver: React.FC = () => {
   }, [
     activeSession?.id,
     isCompletedSession,
+    isLiveExam,
+    activeExam?.isExamPaused,
+    activeExam?.phase,
     isLoadingQuestion,
     currentQuestionId,
     currentQuestionState?.isSubmitted,
     syncSessionTime,
+  ]);
+
+  // Auto-advance when live exam module timer or break timer expires
+  useEffect(() => {
+    if (!isLiveExam || !activeExam || activeExam.isExamPaused || isTransitioningExamModule) {
+      return;
+    }
+    if (activeExam.phase === 'break' && activeExam.breakTimeRemainingMs <= 0) {
+      skipExamBreak();
+      return;
+    }
+    if (
+      (activeExam.phase === 'testing' || activeExam.phase === 'module-review') &&
+      activeModule &&
+      !activeModule.locked &&
+      activeModule.timeRemainingMs <= 0
+    ) {
+      lockCurrentModuleAndAdvance().catch(() => {});
+    }
+  }, [
+    isLiveExam,
+    activeExam,
+    activeModule,
+    isTransitioningExamModule,
+    skipExamBreak,
+    lockCurrentModuleAndAdvance,
   ]);
 
   const totalQuestions = activeSession?.questionIds.length || 0;
@@ -316,6 +385,14 @@ export const QuestionSolver: React.FC = () => {
   );
 
   const handleEscapeOverlays = useCallback((): boolean => {
+    if (isExitModalOpen) {
+      setIsExitModalOpen(false);
+      return true;
+    }
+    if (isQuestionGridOpen) {
+      setIsQuestionGridOpen(false);
+      return true;
+    }
     if (isScratchpadOpen) {
       setIsScratchpadOpen(false);
       return true;
@@ -334,6 +411,8 @@ export const QuestionSolver: React.FC = () => {
     }
     return false;
   }, [
+    isExitModalOpen,
+    isQuestionGridOpen,
     isScratchpadOpen,
     isSprDirectionsOpen,
     isReferenceOpen,
@@ -350,20 +429,38 @@ export const QuestionSolver: React.FC = () => {
   // Math is always a single column with any stimulus equation/table/graph directly above the stem.
   const useSplitPassageColumn = hasPassage && !isMathSubject;
 
+  const isCurrentFlagged = Boolean(
+    isLiveExam &&
+      currentQuestionId &&
+      activeExam?.flaggedQuestionIds.includes(currentQuestionId)
+  );
+
   usePracticeShortcuts({
-    enabled: Boolean(activeSession && currentQuestionId && currentQuestionState),
+    enabled: Boolean(
+      activeSession &&
+        currentQuestionId &&
+        currentQuestionState &&
+        (!isLiveExam || (activeExam?.phase === 'testing' && !activeExam?.isExamPaused))
+    ),
     isMcq: question?.questionType === 'mcq',
     isSubmitted: Boolean(currentQuestionState?.isSubmitted),
     hasDraftAnswer: canSubmitAnswer,
     canGoPrev: currentIdx > 0,
     canGoNext: currentIdx < totalQuestions - 1,
     canUseScratchpad: isDesktopSmUp,
+    isLiveExam,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
     onPrevQuestion: () => goToQuestionIndex(currentIdx - 1),
     onNextQuestion: () => goToQuestionIndex(currentIdx + 1),
     onToggleScratchpad: handleToggleScratchpad,
+    onToggleFlag: isLiveExam && currentQuestionId
+      ? () => {
+          soundEngine.play(isCurrentFlagged ? 'deselect' : 'select');
+          toggleFlagQuestion(currentQuestionId);
+        }
+      : undefined,
     onEscape: handleEscapeOverlays,
   });
 
@@ -450,35 +547,54 @@ export const QuestionSolver: React.FC = () => {
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
-          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button) */}
+          {/* Left: 1600prep Brand Mark & Wordmark (Exit / Save & Exit during Live Exam) */}
           <div className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => {
                 soundEngine.play('click');
-                closeActiveSession();
+                if (isLiveExam) {
+                  setIsExitModalOpen(true);
+                } else {
+                  closeActiveSession();
+                }
               }}
               className="group flex items-center cursor-pointer focus:outline-none"
-              title="Return to main menu"
+              title={isLiveExam ? 'Exit exam' : 'Return to main menu'}
             >
               <BrandLogo />
             </button>
           </div>
 
-          {/* Center (lg+): Question Timer with Minimal Icon-Only Hide/Show Toggle */}
+          {/* Center (lg+): Countdown Timer + Pause (Live Exam) or Question Timer (Practice/Review) */}
           <div className="flex shrink-0 items-center gap-1.5 lg:absolute lg:left-1/2 lg:-translate-x-1/2">
-            <span
-              className="font-mono text-lg sm:text-xl font-medium tabular-nums tracking-tight text-[#F5F5F5]"
-              title="Question elapsed time"
-            >
-              {isTimerHidden
-                ? '—'
-                : formatDuration(
-                    currentQuestionState.isSubmitted
-                      ? currentQuestionState.timeSpent
-                      : questionTimerMs
-                  )}
-            </span>
+            {(() => {
+              const displayMs = isLiveExam
+                ? activeExam?.phase === 'break'
+                  ? activeExam.breakTimeRemainingMs
+                  : activeModule?.timeRemainingMs ?? 0
+                : currentQuestionState.isSubmitted
+                ? currentQuestionState.timeSpent
+                : questionTimerMs;
+
+              const timerColorClass =
+                isLiveExam && !isTimerHidden
+                  ? displayMs <= 60_000
+                    ? 'text-red-400'
+                    : displayMs <= 5 * 60_000
+                    ? 'text-amber-300'
+                    : 'text-[#F5F5F5]'
+                  : 'text-[#F5F5F5]';
+
+              return (
+                <span
+                  className={`font-mono text-lg sm:text-xl font-medium tabular-nums tracking-tight ${timerColorClass}`}
+                  title={isLiveExam ? 'Time remaining' : 'Question elapsed time'}
+                >
+                  {isTimerHidden ? '—' : formatDuration(displayMs)}
+                </span>
+              );
+            })()}
 
             <button
               type="button"
@@ -496,91 +612,124 @@ export const QuestionSolver: React.FC = () => {
                 <EyeOff className="h-4 w-4" />
               )}
             </button>
+
+            {isLiveExam && activeExam?.phase !== 'break' && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.play('click');
+                  togglePauseSession();
+                }}
+                className={`ml-0.5 inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors cursor-pointer ${
+                  activeExam?.isExamPaused
+                    ? 'border-[#69ff00]/50 bg-[#69ff00]/10 text-[#69ff00]'
+                    : 'border-[#29292E] bg-[#141417] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
+                }`}
+                title={activeExam?.isExamPaused ? 'Resume exam' : 'Pause exam'}
+                aria-label={activeExam?.isExamPaused ? 'Resume exam' : 'Pause exam'}
+              >
+                {activeExam?.isExamPaused ? (
+                  <>
+                    <Play className="h-3 w-3" />
+                    <span className="hidden sm:inline">Resume</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-3 w-3" />
+                    <span className="hidden sm:inline">Pause</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Right: Desktop/Tablet Tools (Calculator, Reference, Scratchpad) + Share */}
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            <div className="hidden sm:flex items-center gap-1.5">
-              {isMathSubject && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCalculatorOpen((prev) => {
-                        const next = !prev;
-                        soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                        return next;
-                      });
-                    }}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
-                      isCalculatorOpen
-                        ? 'bg-[#18181B] text-[#69ff00]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                    }`}
-                    title="Graphing Calculator"
-                    aria-label="Graphing Calculator"
-                    aria-pressed={isCalculatorOpen}
-                  >
-                    <Calculator className="h-4 w-4" />
-                    <span className="hidden lg:inline">Calculator</span>
-                  </button>
+            {(!isLiveExam || (activeExam?.phase === 'testing' && !activeExam?.isExamPaused)) && (
+              <div className="hidden sm:flex items-center gap-1.5">
+                {isMathSubject && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCalculatorOpen((prev) => {
+                          const next = !prev;
+                          soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                          return next;
+                        });
+                      }}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                        isCalculatorOpen
+                          ? 'bg-[#18181B] text-[#69ff00]'
+                          : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                      }`}
+                      title="Graphing Calculator"
+                      aria-label="Graphing Calculator"
+                      aria-pressed={isCalculatorOpen}
+                    >
+                      <Calculator className="h-4 w-4" />
+                      <span className="hidden lg:inline">Calculator</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsReferenceOpen((prev) => {
-                        const next = !prev;
-                        soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                        return next;
-                      });
-                    }}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
-                      isReferenceOpen
-                        ? 'bg-[#18181B] text-[#69ff00]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                    }`}
-                    title="Math Reference Sheet"
-                    aria-label="Math Reference Sheet"
-                    aria-pressed={isReferenceOpen}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    <span className="hidden lg:inline">Reference</span>
-                  </button>
-                </>
-              )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsReferenceOpen((prev) => {
+                          const next = !prev;
+                          soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
+                          return next;
+                        });
+                      }}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                        isReferenceOpen
+                          ? 'bg-[#18181B] text-[#69ff00]'
+                          : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                      }`}
+                      title="Math Reference Sheet"
+                      aria-label="Math Reference Sheet"
+                      aria-pressed={isReferenceOpen}
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      <span className="hidden lg:inline">Reference</span>
+                    </button>
+                  </>
+                )}
 
-              {/* Scratchpad Toggle Button */}
+                {/* Scratchpad Toggle Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleScratchpad}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                    isScratchpadOpen
+                      ? 'bg-[#18181B] text-[#69ff00]'
+                      : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                  }`}
+                  title="Toggle Scratchpad"
+                  aria-label="Toggle Scratchpad"
+                  aria-pressed={isScratchpadOpen}
+                >
+                  <PenTool className="h-4 w-4" />
+                  <span className="hidden lg:inline">Scratchpad</span>
+                </button>
+              </div>
+            )}
+
+            {/* Icon-only Share Question Link Button (hidden during live exam to keep workspace spoiler-free) */}
+            {!isLiveExam && (
               <button
                 type="button"
-                onClick={handleToggleScratchpad}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
-                  isScratchpadOpen
-                    ? 'bg-[#18181B] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-                title="Toggle Scratchpad"
-                aria-label="Toggle Scratchpad"
-                aria-pressed={isScratchpadOpen}
+                onClick={handleShareQuestion}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+                title={isShareCopied ? 'Link copied!' : 'Copy link to this question'}
+                aria-label="Copy link to this question"
               >
-                <PenTool className="h-4 w-4" />
-                <span className="hidden lg:inline">Scratchpad</span>
+                {isShareCopied ? (
+                  <Check className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
               </button>
-            </div>
-
-            {/* Icon-only Share Question Link Button without background or text */}
-            <button
-              type="button"
-              onClick={handleShareQuestion}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-              title={isShareCopied ? 'Link copied!' : 'Copy link to this question'}
-              aria-label="Copy link to this question"
-            >
-              {isShareCopied ? (
-                <Check className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <Share2 className="h-4 w-4" />
-              )}
-            </button>
+            )}
           </div>
         </div>
       </header>
@@ -589,7 +738,7 @@ export const QuestionSolver: React.FC = () => {
       {isMathSubject && (
         <>
           <MathCalculatorPanel
-            isOpen={isCalculatorOpen}
+            isOpen={isCalculatorOpen && isTestingPhase && !activeExam?.isExamPaused}
             layout={calculatorLayout}
             dockWidth={calculatorDockWidth}
             footerHeight={footerHeight}
@@ -602,7 +751,7 @@ export const QuestionSolver: React.FC = () => {
             }}
           />
           <MathReferenceSheet
-            isOpen={isReferenceOpen}
+            isOpen={isReferenceOpen && isTestingPhase && !activeExam?.isExamPaused}
             onClose={() => {
               soundEngine.play('toggleClose');
               setIsReferenceOpen(false);
@@ -611,7 +760,7 @@ export const QuestionSolver: React.FC = () => {
         </>
       )}
       <SprDirectionsWindow
-        isOpen={isSprDirectionsOpen}
+        isOpen={isSprDirectionsOpen && isTestingPhase && !activeExam?.isExamPaused}
         onClose={() => {
           soundEngine.play('toggleClose');
           setIsSprDirectionsOpen(false);
@@ -622,11 +771,11 @@ export const QuestionSolver: React.FC = () => {
       <main
         style={{
           paddingLeft:
-            isCalculatorDocked && calculatorLayout === 'left'
+            isCalculatorDocked && isTestingPhase && !activeExam?.isExamPaused && calculatorLayout === 'left'
               ? `${calculatorDockWidth}px`
               : undefined,
           paddingRight:
-            isCalculatorDocked && calculatorLayout === 'right'
+            isCalculatorDocked && isTestingPhase && !activeExam?.isExamPaused && calculatorLayout === 'right'
               ? `${calculatorDockWidth}px`
               : undefined,
         }}
@@ -638,17 +787,55 @@ export const QuestionSolver: React.FC = () => {
       >
         {/* Transparent Full-Screen HTML5 Canvas Scratchpad Overlay */}
         <ScratchpadOverlay
-          isOpen={isScratchpadOpen && isDesktopSmUp}
+          isOpen={
+            isScratchpadOpen &&
+            isDesktopSmUp &&
+            isTestingPhase &&
+            !activeExam?.isExamPaused
+          }
           questionId={currentQuestionId}
           strokes={scratchpadMap[currentQuestionId] || []}
           onChangeStrokes={handleUpdateScratchpadStrokes}
           onClose={() => setIsScratchpadOpen(false)}
         />
 
-        {/* Dedicated Examination Content Container */}
+        {/* Live Exam Interstitial Screens: Paused, 10m Break, or End-of-Module Review */}
+        {isLiveExam && activeExam?.isExamPaused ? (
+          <ExamPauseScreen
+            moduleLabel={activeModule?.label || activeSession.title}
+            timeRemainingMs={
+              activeExam.phase === 'break'
+                ? activeExam.breakTimeRemainingMs
+                : activeModule?.timeRemainingMs ?? 0
+            }
+            onResume={togglePauseSession}
+          />
+        ) : isLiveExam && activeExam?.phase === 'break' ? (
+          <ExamBreakScreen
+            breakTimeRemainingMs={activeExam.breakTimeRemainingMs}
+            onStartMathSection={skipExamBreak}
+          />
+        ) : isLiveExam && activeExam?.phase === 'module-review' && activeModule ? (
+          <ExamModuleReviewScreen
+            activeModule={activeModule}
+            questionStates={activeSession.questionStates}
+            flaggedQuestionIds={activeExam.flaggedQuestionIds}
+            isFinalModule={
+              activeModule.moduleNumber === 2 &&
+              (activeExam.track !== 'full' || activeModule.subject === 'math')
+            }
+            isTransitioning={isTransitioningExamModule}
+            onJumpToQuestion={(idx) => goToQuestionIndex(idx)}
+            onBackToLastQuestion={() => goToQuestionIndex(activeModule.questionIds.length - 1)}
+            onSubmitModule={() => lockCurrentModuleAndAdvance()}
+          />
+        ) : (
+        /* Dedicated Examination Content Container */
         <div
           className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
-            isScratchpadOpen && isDesktopSmUp ? 'pointer-events-none select-none' : ''
+            isScratchpadOpen && isDesktopSmUp && isTestingPhase && !activeExam?.isExamPaused
+              ? 'pointer-events-none select-none'
+              : ''
           }`}
         >
         {isLoadingQuestion ? (
@@ -710,63 +897,108 @@ export const QuestionSolver: React.FC = () => {
                 useSplitPassageColumn ? 'lg:col-span-6' : ''
               } space-y-8 min-w-0`}
             >
-              {/* Question Metadata Header (Single-line Mobile Skill + ID/Difficulty; Full Breadcrumb on sm+) */}
+              {/* Question Metadata Header: Spoiler-Free Module Label + Mark for Review (Live Exam) OR Full Taxonomy (Practice/Review) */}
               <div>
                 <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-[#1F1F23] pb-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
-                    <span className="flex h-6 min-w-[1.5rem] shrink-0 px-2 items-center justify-center rounded-full bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
-                      {currentIdx + 1}
-                    </span>
-
-                    <span className="hidden sm:inline font-medium text-[#F5F5F5] shrink-0">
-                      {sectionLabel}
-                    </span>
-
-                    {currentMeta?.domainLabel && (
-                      <>
-                        <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
-                        <span
-                          className={`${
-                            currentMeta?.skillLabel ? 'hidden sm:inline' : 'truncate min-w-0'
-                          } text-[#D4D4D8] sm:shrink-0`}
-                        >
-                          {currentMeta.domainLabel}
+                  {isLiveExam ? (
+                    <>
+                      <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+                        <span className="flex h-6 min-w-[1.5rem] shrink-0 px-2 items-center justify-center rounded-full bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
+                          {currentIdx + 1}
                         </span>
-                      </>
-                    )}
-
-                    {currentMeta?.skillLabel && (
-                      <>
-                        <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
-                        <span
-                          className="min-w-0 truncate text-[#D4D4D8] sm:text-[#A1A1AA]"
-                          title={currentMeta.skillLabel}
-                        >
-                          {currentMeta.skillLabel}
+                        <span className="hidden sm:inline font-medium text-[#F5F5F5] truncate">
+                          {activeModule?.label || sectionLabel}
                         </span>
-                      </>
-                    )}
+                        <span className="sm:hidden font-medium text-[#F5F5F5] truncate">
+                          {activeModule?.shortLabel || sectionLabel}
+                        </span>
+                      </div>
 
-                    {!currentMeta?.skillLabel && !currentMeta?.domainLabel && (
-                      <span className="sm:hidden font-medium text-[#F5F5F5] truncate min-w-0">
-                        {sectionLabel}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-                    {currentMeta?.difficulty && (
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${diffBadge.className}`}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.play(isCurrentFlagged ? 'deselect' : 'select');
+                          toggleFlagQuestion(currentQuestionId);
+                        }}
+                        aria-pressed={isCurrentFlagged}
+                        title="Mark question for review (F)"
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                          isCurrentFlagged
+                            ? 'border-amber-500/45 bg-amber-500/12 text-amber-300'
+                            : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
+                        }`}
                       >
-                        {diffBadge.label}
-                      </span>
-                    )}
+                        <Flag
+                          className={`h-3 w-3 ${
+                            isCurrentFlagged ? 'fill-amber-400 text-amber-400' : ''
+                          }`}
+                        />
+                        <span className="hidden sm:inline">
+                          {isCurrentFlagged ? 'Flagged' : 'Mark for Review'}
+                        </span>
+                        <span className="sm:hidden">
+                          {isCurrentFlagged ? 'Flagged' : 'Review'}
+                        </span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+                        <span className="flex h-6 min-w-[1.5rem] shrink-0 px-2 items-center justify-center rounded-full bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
+                          {currentIdx + 1}
+                        </span>
 
-                    <span className="font-mono text-xs text-[#71717A] shrink-0">
-                      ID {currentQuestionId}
-                    </span>
-                  </div>
+                        <span className="hidden sm:inline font-medium text-[#F5F5F5] shrink-0">
+                          {sectionLabel}
+                        </span>
+
+                        {currentMeta?.domainLabel && (
+                          <>
+                            <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
+                            <span
+                              className={`${
+                                currentMeta?.skillLabel ? 'hidden sm:inline' : 'truncate min-w-0'
+                              } text-[#D4D4D8] sm:shrink-0`}
+                            >
+                              {currentMeta.domainLabel}
+                            </span>
+                          </>
+                        )}
+
+                        {currentMeta?.skillLabel && (
+                          <>
+                            <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
+                            <span
+                              className="min-w-0 truncate text-[#D4D4D8] sm:text-[#A1A1AA]"
+                              title={currentMeta.skillLabel}
+                            >
+                              {currentMeta.skillLabel}
+                            </span>
+                          </>
+                        )}
+
+                        {!currentMeta?.skillLabel && !currentMeta?.domainLabel && (
+                          <span className="sm:hidden font-medium text-[#F5F5F5] truncate min-w-0">
+                            {sectionLabel}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                        {currentMeta?.difficulty && (
+                          <span
+                            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${diffBadge.className}`}
+                          >
+                            {diffBadge.label}
+                          </span>
+                        )}
+
+                        <span className="font-mono text-xs text-[#71717A] shrink-0">
+                          ID {currentQuestionId}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Math Stimulus (equation, table, system, or figure stored in question.passage) directly above stem */}
@@ -1016,8 +1248,8 @@ export const QuestionSolver: React.FC = () => {
                 </div>
               )}
 
-              {/* Primary Check / Submit Action */}
-              {!currentQuestionState.isSubmitted && (
+              {/* Primary Check / Submit Action (Topic Practice only) */}
+              {!isLiveExam && !currentQuestionState.isSubmitted && (
                 <div className="flex items-center justify-end pt-2">
                   <Button3D
                     variant="primary"
@@ -1031,8 +1263,8 @@ export const QuestionSolver: React.FC = () => {
                 </div>
               )}
 
-              {/* Instant Feedback & Explanation Area */}
-              {currentQuestionState.isSubmitted && (
+              {/* Instant Feedback & Explanation Area (Topic Practice + Post-Exam Review Mode only) */}
+              {!isLiveExam && currentQuestionState.isSubmitted && (
                 <div
                   aria-live="polite"
                   className={`overflow-hidden rounded-2xl border border-[#29292E] bg-[#111113] ${
@@ -1093,7 +1325,7 @@ export const QuestionSolver: React.FC = () => {
                           <div className="inline-flex items-center gap-2 rounded-full border border-[#29292E] bg-[#0A0A0B] px-3.5 py-1.5 text-xs">
                             <span className="text-[#71717A]">Your answer</span>
                             <span className="font-mono font-semibold text-red-400">
-                              {currentQuestionState.submittedAnswer}
+                              {currentQuestionState.submittedAnswer || 'None'}
                             </span>
                           </div>
 
@@ -1137,76 +1369,166 @@ export const QuestionSolver: React.FC = () => {
           </div>
         )}
         </div>
+        )}
       </main>
 
       {/* Bottom Examination Navigation Bar */}
-      <footer
-        ref={footerRef}
-        className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
-          <Button3D
-            variant="secondary"
-            size="sm"
-            className={`${footerBtnClass} shrink-0`}
-            onClick={
-              isCompletedSession
-                ? () => setIsSessionSummaryView(true)
-                : completeSession
-            }
-          >
-            <span>Complete Session</span>
-          </Button3D>
-
-          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <Button3D
-              variant="secondary"
-              size="sm"
-              className={footerNavBtnClass}
-              silentClick
-              disabled={currentIdx === 0}
-              onClick={() => {
-                soundEngine.play('navigate');
-                goToQuestionIndex(currentIdx - 1);
-              }}
-            >
-              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Previous</span>
-            </Button3D>
-
-            {currentIdx < totalQuestions - 1 ? (
+      {(!isLiveExam || (activeExam?.phase === 'testing' && !activeExam?.isExamPaused)) && (
+        <footer
+          ref={footerRef}
+          className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
+        >
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
+            {isLiveExam ? (
               <Button3D
-                variant={
-                  currentQuestionState.isSubmitted ? 'primary' : 'secondary'
-                }
+                variant="secondary"
                 size="sm"
-                className={footerNavBtnClass}
-                silentClick
+                className={`${footerBtnClass} shrink-0`}
                 onClick={() => {
-                  soundEngine.play('navigate');
-                  goToQuestionIndex(currentIdx + 1);
+                  soundEngine.play('click');
+                  setIsQuestionGridOpen(true);
                 }}
               >
-                <span>Next</span>
-                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">
+                  Question {currentIdx + 1} of {totalQuestions}
+                </span>
+                <span className="sm:hidden tabular-nums">
+                  {currentIdx + 1}/{totalQuestions}
+                </span>
               </Button3D>
+            ) : isExamReview ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <Button3D
+                  variant="secondary"
+                  size="sm"
+                  className={`${footerBtnClass} shrink-0`}
+                  onClick={() => setIsSessionSummaryView(true)}
+                >
+                  <span>Score Report</span>
+                </Button3D>
+                <Button3D
+                  variant="secondary"
+                  size="sm"
+                  className={`${footerBtnClass} shrink-0`}
+                  onClick={() => {
+                    soundEngine.play('click');
+                    setIsQuestionGridOpen(true);
+                  }}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="tabular-nums">
+                    {currentIdx + 1}/{totalQuestions}
+                  </span>
+                </Button3D>
+              </div>
             ) : (
               <Button3D
-                variant="primary"
+                variant="secondary"
                 size="sm"
-                className={footerNavBtnClass}
+                className={`${footerBtnClass} shrink-0`}
                 onClick={
                   isCompletedSession
                     ? () => setIsSessionSummaryView(true)
                     : completeSession
                 }
               >
-                <span>Finish</span>
+                <span>Complete Session</span>
               </Button3D>
             )}
+
+            <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+              <Button3D
+                variant="secondary"
+                size="sm"
+                className={footerNavBtnClass}
+                silentClick
+                disabled={currentIdx === 0}
+                onClick={() => {
+                  soundEngine.play('navigate');
+                  goToQuestionIndex(currentIdx - 1);
+                }}
+              >
+                <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Previous</span>
+              </Button3D>
+
+              {currentIdx < totalQuestions - 1 ? (
+                <Button3D
+                  variant={
+                    !isLiveExam && currentQuestionState.isSubmitted
+                      ? 'primary'
+                      : 'secondary'
+                  }
+                  size="sm"
+                  className={footerNavBtnClass}
+                  silentClick
+                  onClick={() => {
+                    soundEngine.play('navigate');
+                    goToQuestionIndex(currentIdx + 1);
+                  }}
+                >
+                  <span>Next</span>
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button3D>
+              ) : isLiveExam ? (
+                <Button3D
+                  variant="primary"
+                  size="sm"
+                  className={footerNavBtnClass}
+                  onClick={() => {
+                    soundEngine.play('click');
+                    setExamPhase('module-review');
+                  }}
+                >
+                  <span>Check Work</span>
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button3D>
+              ) : (
+                <Button3D
+                  variant="primary"
+                  size="sm"
+                  className={footerNavBtnClass}
+                  onClick={
+                    isCompletedSession
+                      ? () => setIsSessionSummaryView(true)
+                      : completeSession
+                  }
+                >
+                  <span>{isExamReview ? 'Report' : 'Finish'}</span>
+                </Button3D>
+              )}
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
+
+      {/* Question Navigator Popover (Live Exam & Post-Exam Review) */}
+      <ExamQuestionGridPopover
+        isOpen={isQuestionGridOpen}
+        questionIds={activeSession.questionIds}
+        currentIndex={currentIdx}
+        questionStates={activeSession.questionStates}
+        flaggedQuestionIds={activeExam?.flaggedQuestionIds || []}
+        isReviewMode={isExamReview}
+        moduleLabel={isExamReview ? 'All Exam Questions' : activeModule?.label}
+        onSelectIndex={goToQuestionIndex}
+        onClose={() => setIsQuestionGridOpen(false)}
+      />
+
+      {/* Live Exam Exit Confirmation Modal */}
+      <ExamExitModal
+        isOpen={isExitModalOpen}
+        onContinue={() => setIsExitModalOpen(false)}
+        onSaveAndExit={() => {
+          setIsExitModalOpen(false);
+          exitAndSaveExam();
+        }}
+        onDiscard={() => {
+          setIsExitModalOpen(false);
+          discardSavedExam().then(() => closeActiveSession());
+        }}
+      />
     </div>
   );
 };

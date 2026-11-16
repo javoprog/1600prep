@@ -6,19 +6,63 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
+  Clock,
+  Layers,
   Loader2,
+  Play,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
   DifficultyCode,
+  ExamTrack,
   PracticeFilters,
   PracticeMode,
   SubjectCode,
 } from '@/types';
 import { Button3D } from '@/components/ui/Button3D';
 import { soundEngine } from '@/services/sound/soundEngine';
+import { formatDuration } from '@/utils/formatTime';
 
+type WorkspaceTab = 'topic' | 'exam';
 type WizardStep = 1 | 2;
+
+const EXAM_TRACK_OPTIONS: ReadonlyArray<{
+  id: ExamTrack;
+  badge: string;
+  title: string;
+  description: string;
+  statsLeft: string;
+  statsRight: string;
+}> = [
+  {
+    id: 'full',
+    badge: '98 questions • 2h 14m',
+    title: 'Full Test',
+    description:
+      'Complete Digital SAT with adaptive Reading & Writing (2 × 32m), optional 10-minute break, and adaptive Math (2 × 35m).',
+    statsLeft: '4 modules + break',
+    statsRight: 'Score 400–1600',
+  },
+  {
+    id: 'rw',
+    badge: '54 questions • 64m',
+    title: 'Only RW Full Practice',
+    description:
+      'Complete Reading & Writing section: 27-question Module 1 followed by an adaptive 27-question Module 2.',
+    statsLeft: '2 × 32m modules',
+    statsRight: 'Score 200–800',
+  },
+  {
+    id: 'math',
+    badge: '44 questions • 70m',
+    title: 'Only Math Full Practice',
+    description:
+      'Complete Math section: 22-question Module 1 and adaptive 22-question Module 2 with Desmos and Reference Sheet.',
+    statsLeft: '2 × 35m modules',
+    statsRight: 'Score 200–800',
+  },
+];
 
 const DIFFICULTY_OPTIONS: Array<{
   id: DifficultyCode;
@@ -77,7 +121,20 @@ export function formatDifficultySelectionLabel(
 }
 
 export const PracticeWizard: React.FC = () => {
-  const { metas, taxonomy, startPracticeSession } = useApp();
+  const {
+    metas,
+    taxonomy,
+    startPracticeSession,
+    startFullExam,
+    savedResumeExam,
+    resumeSavedExam,
+    discardSavedExam,
+  } = useApp();
+
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('topic');
+  const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrack>('full');
+  const [isStartingExam, setIsStartingExam] = useState<boolean>(false);
+  const [examError, setExamError] = useState<string | null>(null);
 
   const [step, setStep] = useState<WizardStep>(1);
   const [stepDirection, setStepDirection] = useState<'none' | 'forward' | 'backward'>('none');
@@ -303,9 +360,240 @@ export const PracticeWizard: React.FC = () => {
     }
   };
 
+  const handleStartExam = async () => {
+    if (isStartingExam) return;
+    setExamError(null);
+    setIsStartingExam(true);
+    try {
+      soundEngine.play('select');
+      await startFullExam(selectedExamTrack);
+    } catch (err) {
+      setExamError(
+        err instanceof Error ? err.message : 'Unable to start Full Practice exam.'
+      );
+      setIsStartingExam(false);
+    }
+  };
+
+  const resumeActiveMod =
+    savedResumeExam?.exam?.modules[savedResumeExam.exam.currentModuleIndex];
+  const resumeAnsweredCount = resumeActiveMod
+    ? resumeActiveMod.questionIds.filter((qId) =>
+        Boolean(savedResumeExam?.questionStates[qId]?.draftAnswer.trim())
+      ).length
+    : 0;
+
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Subtle 2-Step Indicator Header */}
+      {/* Unfinished Full Exam Recovery Banner */}
+      {savedResumeExam && savedResumeExam.exam && (
+        <div className="mb-8 rounded-2xl border border-[#29292E] bg-[#111113] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-content-in">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-[#69ff00]/40 bg-[#69ff00]/10 px-2.5 py-0.5 font-medium text-[#69ff00]">
+                In-Progress Exam
+              </span>
+              <span className="text-[#A1A1AA]">
+                {savedResumeExam.exam.phase === 'break'
+                  ? '10-Minute Break'
+                  : resumeActiveMod?.label || savedResumeExam.title}
+              </span>
+            </div>
+            <div className="text-sm font-semibold text-[#F5F5F5]">
+              {savedResumeExam.title}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[#71717A] tabular-nums">
+              {resumeActiveMod && savedResumeExam.exam.phase !== 'break' && (
+                <>
+                  <span>
+                    {resumeAnsweredCount} of {resumeActiveMod.questionIds.length} answered
+                  </span>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatDuration(resumeActiveMod.timeRemainingMs)} left
+                  </span>
+                </>
+              )}
+              {savedResumeExam.exam.phase === 'break' && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  Break {formatDuration(savedResumeExam.exam.breakTimeRemainingMs)} left
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Button3D
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                soundEngine.play('click');
+                discardSavedExam();
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Discard</span>
+            </Button3D>
+            <Button3D
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                soundEngine.play('select');
+                resumeSavedExam();
+              }}
+            >
+              <Play className="h-3.5 w-3.5" />
+              <span>Resume Exam</span>
+            </Button3D>
+          </div>
+        </div>
+      )}
+
+      {/* Top Mode Switcher: Topic Practice vs Full Exam */}
+      <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+        <div
+          role="tablist"
+          aria-label="Practice mode"
+          className="inline-flex rounded-full border border-[#29292E] bg-[#111113] p-1"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={workspaceTab === 'topic'}
+            onClick={() => {
+              soundEngine.play('click');
+              setWorkspaceTab('topic');
+            }}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+              workspaceTab === 'topic'
+                ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+            }`}
+          >
+            Topic Practice
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={workspaceTab === 'exam'}
+            onClick={() => {
+              soundEngine.play('click');
+              setWorkspaceTab('exam');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+              workspaceTab === 'exam'
+                ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span>Full Exam</span>
+          </button>
+        </div>
+      </div>
+
+      {workspaceTab === 'exam' ? (
+        <div className="space-y-8 animate-content-in">
+          <div>
+            <p className="text-xs font-medium text-white">Adaptive Digital SAT</p>
+            <h1 className="mt-1 font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">
+              Choose your full practice mode
+            </h1>
+            <p className="mt-2 text-sm text-[#A1A1AA]">
+              Timed modules with adaptive Module 2 routing, silent answers until
+              completion, and a realistic predicted score report.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {EXAM_TRACK_OPTIONS.map((opt) => {
+              const isSelected = selectedExamTrack === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    soundEngine.play('select');
+                    setSelectedExamTrack(opt.id);
+                    setExamError(null);
+                  }}
+                  className={`group text-left rounded-2xl border p-6 transition-all duration-150 cursor-pointer ${
+                    isSelected
+                      ? 'border-[#69ff00] bg-[#18181B]'
+                      : 'border-[#29292E] bg-[#111113] hover:border-[#3F3F46] hover:bg-[#18181B]/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-[#A1A1AA]">
+                      {opt.badge}
+                    </span>
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        isSelected
+                          ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
+                          : 'border-[#3F3F46]'
+                      }`}
+                    >
+                      {isSelected && <Check className="h-3 w-3 stroke-[2.5]" />}
+                    </span>
+                  </div>
+
+                  <h2 className="mt-3 font-editorial text-xl sm:text-2xl text-[#F5F5F5]">
+                    {opt.title}
+                  </h2>
+                  <p className="mt-1.5 text-xs text-[#A1A1AA] leading-relaxed max-w-xl">
+                    {opt.description}
+                  </p>
+
+                  <div className="mt-5 pt-4 border-t border-[#1F1F23] flex items-center justify-between text-xs text-[#71717A]">
+                    <span>{opt.statsLeft}</span>
+                    <span className="font-medium tabular-nums text-[#F5F5F5]">
+                      {opt.statsRight}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {examError && (
+            <div className="flex items-start gap-2.5 rounded-2xl border border-[#4C2024] bg-[#201214] p-4 text-xs text-red-200">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+              <span>{examError}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#1F1F23] pt-6">
+            <span className="text-xs text-[#71717A]">
+              Explanations unlock automatically once all modules are finished.
+            </span>
+
+            <Button3D
+              variant="primary"
+              size="lg"
+              disabled={isStartingExam || metas.length === 0}
+              onClick={handleStartExam}
+              className="px-7"
+            >
+              {isStartingExam ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Building Exam...</span>
+                </>
+              ) : (
+                <>
+                  <span>Start Exam</span>
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
+            </Button3D>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Subtle 2-Step Indicator Header */}
       <div className="mb-8 flex items-center justify-between border-b border-[#1F1F23] pb-4">
         <div className="flex items-center gap-3">
           {([1, 2] as WizardStep[]).map((s) => {
@@ -702,6 +990,8 @@ export const PracticeWizard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

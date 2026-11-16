@@ -11,12 +11,14 @@ export interface UsePracticeShortcutsParams {
   canGoPrev: boolean;
   canGoNext: boolean;
   canUseScratchpad?: boolean;
+  isLiveExam?: boolean;
   onSelectOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onToggleEliminateOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onSubmitAnswer: () => void;
   onPrevQuestion: () => void;
   onNextQuestion: () => void;
   onToggleScratchpad: () => void;
+  onToggleFlag?: () => void;
   onEscape: () => boolean; // returns true if an overlay/modal was closed
 }
 
@@ -28,12 +30,14 @@ export function usePracticeShortcuts({
   canGoPrev,
   canGoNext,
   canUseScratchpad = true,
+  isLiveExam = false,
   onSelectOption,
   onToggleEliminateOption,
   onSubmitAnswer,
   onPrevQuestion,
   onNextQuestion,
   onToggleScratchpad,
+  onToggleFlag,
   onEscape,
 }: UsePracticeShortcutsParams): void {
   useEffect(() => {
@@ -72,6 +76,13 @@ export function usePracticeShortcuts({
         return;
       }
 
+      // 'F' / 'f': toggle Mark for Review in live exam
+      if (isLiveExam && (e.key === 'f' || e.key === 'F') && onToggleFlag) {
+        e.preventDefault();
+        onToggleFlag();
+        return;
+      }
+
       // ArrowRight: next question
       if (e.key === 'ArrowRight') {
         if (canGoNext) {
@@ -92,8 +103,8 @@ export function usePracticeShortcuts({
         return;
       }
 
-      // Enter / Space: submit answer (avoid intercepting when an interactive control has focus)
-      if (e.key === 'Enter' || e.key === ' ') {
+      // Enter / Space: submit answer in Topic Practice (disabled in live Full Exam)
+      if (!isLiveExam && (e.key === 'Enter' || e.key === ' ')) {
         if (target?.closest('button, a, [role="button"]')) return;
         if (!isSubmitted && hasDraftAnswer) {
           e.preventDefault();
@@ -156,12 +167,14 @@ export function usePracticeShortcuts({
     canGoPrev,
     canGoNext,
     canUseScratchpad,
+    isLiveExam,
     onSelectOption,
     onToggleEliminateOption,
     onSubmitAnswer,
     onPrevQuestion,
     onNextQuestion,
     onToggleScratchpad,
+    onToggleFlag,
     onEscape,
   ]);
 }
