@@ -29,7 +29,11 @@ export const TopNav: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
-      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:py-0 sm:px-6">
+      <div
+        className={`relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-1.5 px-4 sm:h-16 sm:flex-nowrap sm:py-0 sm:px-6 ${
+          showHomeTabs ? 'pt-2.5 pb-0' : 'py-2.5'
+        }`}
+      >
         {/* Editorial Brand Mark & Wordmark */}
         <Link
           href="/"
@@ -44,48 +48,48 @@ export const TopNav: React.FC = () => {
           <BrandLogo />
         </Link>
 
-        {/* Center Mode Switcher Tabs: Topic Practice vs Full Practice */}
+        {/* Center Header Navigation Tabs: Topic Practice vs Full Practice */}
         {showHomeTabs && (
-          <div className="order-3 flex w-full justify-center sm:order-2 sm:w-auto sm:absolute sm:left-1/2 sm:-translate-x-1/2">
-            <div
-              role="tablist"
-              aria-label="Practice mode"
-              className="inline-flex w-full sm:w-auto items-center rounded-full border border-[#29292E] bg-[#111113] p-1"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={homeTab === 'topic'}
-                onClick={() => {
-                  soundEngine.play('click');
-                  setHomeTab('topic');
-                }}
-                className={`flex-1 sm:flex-initial rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                  homeTab === 'topic'
-                    ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-              >
-                Topic Practice
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={homeTab === 'full'}
-                onClick={() => {
-                  soundEngine.play('click');
-                  setHomeTab('full');
-                }}
-                className={`flex-1 sm:flex-initial rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                  homeTab === 'full'
-                    ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-              >
-                Full Practice
-              </button>
-            </div>
-          </div>
+          <nav
+            role="tablist"
+            aria-label="Practice mode"
+            className="order-3 flex w-full items-center justify-center gap-7 sm:order-2 sm:w-auto sm:h-full sm:gap-8 sm:absolute sm:left-1/2 sm:-translate-x-1/2"
+          >
+            {[
+              { id: 'topic' as const, label: 'Topic Practice' },
+              { id: 'full' as const, label: 'Full Practice' },
+            ].map((tab) => {
+              const isActive = homeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onMouseEnter={() => soundEngine.play('hover')}
+                  onClick={() => {
+                    if (!isActive) {
+                      soundEngine.play('click');
+                    }
+                    setHomeTab(tab.id);
+                  }}
+                  className={`relative flex items-center justify-center pt-1 pb-2.5 sm:h-full sm:py-0 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    isActive
+                      ? 'text-[#F5F5F5]'
+                      : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[#69ff00]"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         )}
 
         {/* Right Controls: Sound Toggle */}

@@ -72,10 +72,10 @@ const QuestionTileButton: React.FC<QuestionTileButtonProps> = ({
       <span>{index + 1}</span>
       {isFlagged && (
         <span
-          className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-[#29292E] bg-[#18181B]"
+          className="pointer-events-none absolute -top-1.5 -right-1.5 flex items-center justify-center"
           aria-label="Flagged"
         >
-          <Flag className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+          <Flag className="h-3 w-3 fill-amber-400 text-amber-400" />
         </span>
       )}
     </button>
@@ -377,7 +377,7 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center sm:justify-start sm:pl-6 sm:pb-[74px] bg-black/45 p-3 pb-[74px] animate-page-fade"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 p-3 pb-[74px] sm:pb-[80px] animate-page-fade"
       onClick={onClose}
     >
       <div
@@ -431,7 +431,7 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
                   <div className="mb-2 text-xs font-medium text-[#71717A]">
                     {mod.label}
                   </div>
-                  <div className="grid grid-cols-7 justify-items-center gap-2">
+                  <div className="grid grid-cols-7 justify-items-center gap-x-2 gap-y-2.5">
                     {mod.questionIds.map((qId) => {
                       const globalIdx = indexById.get(qId) ?? 0;
                       return (
@@ -455,7 +455,7 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-7 justify-items-center gap-2">
+            <div className="grid grid-cols-7 justify-items-center gap-x-2 gap-y-2.5">
               {questionIds.map((qId, idx) => (
                 <QuestionTileButton
                   key={qId}

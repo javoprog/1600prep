@@ -16,9 +16,7 @@ import {
   Flag,
   LayoutGrid,
   Loader2,
-  Pause,
   PenTool,
-  Play,
   RefreshCw,
   Share2,
   Undo2,
@@ -602,7 +600,7 @@ export const QuestionSolver: React.FC = () => {
                 soundEngine.play('click');
                 setIsTimerHidden((prev) => !prev);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-[#71717A] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isTimerHidden ? 'Show timer' : 'Hide timer'}
               aria-label={isTimerHidden ? 'Show timer' : 'Hide timer'}
             >
@@ -620,24 +618,33 @@ export const QuestionSolver: React.FC = () => {
                   soundEngine.play('click');
                   togglePauseSession();
                 }}
-                className={`ml-0.5 inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs transition-colors cursor-pointer ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors cursor-pointer ${
                   activeExam?.isExamPaused
                     ? 'bg-[#18181B] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
+                    : 'text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5]'
                 }`}
                 title={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
                 aria-label={activeExam?.isExamPaused ? 'Resume practice' : 'Pause practice'}
               >
                 {activeExam?.isExamPaused ? (
-                  <>
-                    <Play className="h-3 w-3" />
-                    <span className="hidden sm:inline">Resume</span>
-                  </>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M7.5 5.6v12.8a.9.9 0 0 0 1.38.76l10.2-6.4a.9.9 0 0 0 0-1.52L8.88 4.84A.9.9 0 0 0 7.5 5.6z" />
+                  </svg>
                 ) : (
-                  <>
-                    <Pause className="h-3 w-3" />
-                    <span className="hidden sm:inline">Pause</span>
-                  </>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <rect x="6" y="4.5" width="4" height="15" rx="1.25" />
+                    <rect x="14" y="4.5" width="4" height="15" rx="1.25" />
+                  </svg>
                 )}
               </button>
             )}
@@ -1378,49 +1385,28 @@ export const QuestionSolver: React.FC = () => {
           ref={footerRef}
           className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
         >
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
+          <div
+            className={
+              isLiveExam || isExamReview
+                ? 'mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4'
+                : 'mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4'
+            }
+          >
+            {/* Left Slot */}
             {isLiveExam ? (
-              <Button3D
-                variant="secondary"
-                size="sm"
-                className={`${footerBtnClass} shrink-0`}
-                onClick={() => {
-                  soundEngine.play('click');
-                  setIsQuestionGridOpen(true);
-                }}
-              >
-                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">
-                  Question {currentIdx + 1} of {totalQuestions}
-                </span>
-                <span className="sm:hidden tabular-nums">
-                  {currentIdx + 1}/{totalQuestions}
-                </span>
-              </Button3D>
+              <div
+                className="hidden md:block md:col-start-1 md:row-start-1 md:justify-self-start"
+                aria-hidden="true"
+              />
             ) : isExamReview ? (
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="hidden md:block md:col-start-1 md:row-start-1 md:justify-self-start">
                 <Button3D
                   variant="secondary"
                   size="sm"
                   className={`${footerBtnClass} shrink-0`}
                   onClick={() => setIsSessionSummaryView(true)}
                 >
-                  <span className="hidden sm:inline">Score Report</span>
-                  <span className="sm:hidden">Report</span>
-                </Button3D>
-                <Button3D
-                  variant="secondary"
-                  size="sm"
-                  className={`${footerBtnClass} shrink-0`}
-                  onClick={() => {
-                    soundEngine.play('click');
-                    setIsQuestionGridOpen(true);
-                  }}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  <span className="tabular-nums">
-                    {currentIdx + 1}/{totalQuestions}
-                  </span>
+                  <span>Score Report</span>
                 </Button3D>
               </div>
             ) : (
@@ -1438,11 +1424,44 @@ export const QuestionSolver: React.FC = () => {
               </Button3D>
             )}
 
-            <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            {/* Bottom-Center Slot: Question Navigator Trigger */}
+            {(isLiveExam || isExamReview) && (
               <Button3D
                 variant="secondary"
                 size="sm"
-                className={footerNavBtnClass}
+                className={`${footerBtnClass} col-start-2 row-start-1 justify-self-center shrink-0`}
+                onClick={() => {
+                  soundEngine.play('click');
+                  setIsQuestionGridOpen((prev) => !prev);
+                }}
+                aria-expanded={isQuestionGridOpen}
+              >
+                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">
+                  Question {currentIdx + 1} of {totalQuestions}
+                </span>
+                <span className="sm:hidden tabular-nums">
+                  {currentIdx + 1}/{totalQuestions}
+                </span>
+              </Button3D>
+            )}
+
+            {/* Navigation Controls */}
+            <div
+              className={
+                isLiveExam || isExamReview
+                  ? 'contents md:col-start-3 md:row-start-1 md:justify-self-end md:flex md:shrink-0 md:items-center md:gap-2.5'
+                  : 'flex shrink-0 items-center gap-2 sm:gap-2.5'
+              }
+            >
+              <Button3D
+                variant="secondary"
+                size="sm"
+                className={`${footerNavBtnClass} ${
+                  isLiveExam || isExamReview
+                    ? 'col-start-1 row-start-1 justify-self-start'
+                    : ''
+                }`}
                 silentClick
                 disabled={currentIdx === 0}
                 onClick={() => {
@@ -1462,7 +1481,11 @@ export const QuestionSolver: React.FC = () => {
                       : 'secondary'
                   }
                   size="sm"
-                  className={footerNavBtnClass}
+                  className={`${footerNavBtnClass} ${
+                    isLiveExam || isExamReview
+                      ? 'col-start-3 row-start-1 justify-self-end'
+                      : ''
+                  }`}
                   silentClick
                   onClick={() => {
                     soundEngine.play('navigate');
@@ -1476,7 +1499,7 @@ export const QuestionSolver: React.FC = () => {
                 <Button3D
                   variant="primary"
                   size="sm"
-                  className={footerNavBtnClass}
+                  className={`${footerNavBtnClass} col-start-3 row-start-1 justify-self-end`}
                   onClick={() => {
                     soundEngine.play('click');
                     setExamPhase('module-review');
@@ -1489,7 +1512,9 @@ export const QuestionSolver: React.FC = () => {
                 <Button3D
                   variant="primary"
                   size="sm"
-                  className={footerNavBtnClass}
+                  className={`${footerNavBtnClass} ${
+                    isExamReview ? 'col-start-3 row-start-1 justify-self-end' : ''
+                  }`}
                   onClick={
                     isCompletedSession
                       ? () => setIsSessionSummaryView(true)
