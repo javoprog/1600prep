@@ -1,5 +1,26 @@
 export type SubjectCode = 'rw' | 'math';
 
+export type HighlightColor = 'yellow' | 'green' | 'blue' | 'red';
+
+export interface PassageHighlight {
+  id: string;
+  start: number;
+  end: number;
+  color: HighlightColor;
+}
+
+export interface ScratchpadPoint {
+  x: number; // Normalized 0..1 relative to canvas CSS width
+  y: number; // Normalized 0..1 relative to canvas CSS height
+}
+
+export interface ScratchpadStroke {
+  tool: 'pen' | 'eraser';
+  points: ScratchpadPoint[];
+  width: number;
+  color?: string;
+}
+
 export type DifficultyCode = 'E' | 'M' | 'H';
 export type DifficultyFilter = DifficultyCode | 'ALL';
 
@@ -189,6 +210,9 @@ export interface Session {
   currentIndex: number;
   maxVisitedIndex?: number;
   questionStates: Record<string, SessionQuestionState>;
+  highlightsByQuestion?: Record<string, PassageHighlight[]>;
+  eliminatedByQuestion?: Record<string, string[]>;
+  scratchpadByQuestion?: Record<string, ScratchpadStroke[]>;
   startedAt: number;
   completedAt?: number;
   totalTime: number; // milliseconds accumulated across the session

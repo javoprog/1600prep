@@ -106,6 +106,14 @@ body {
   transform: none;
 }
 
+.btn-premium-primary:disabled {
+  opacity: 1;
+  background-color: #18181B;
+  color: #71717A;
+  border-color: #29292E;
+  box-shadow: none;
+}
+
 .btn-premium-primary {
   background-color: var(--brand-primary);
   color: #0A0A0B;

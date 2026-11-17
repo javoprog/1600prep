@@ -10,19 +10,10 @@ import {
   RotateCw,
   Trash2,
 } from 'lucide-react';
+import type { ScratchpadPoint, ScratchpadStroke } from '@/types';
 import { soundEngine } from '@/services/sound/soundEngine';
 
-export interface ScratchpadPoint {
-  x: number; // Normalized 0..1 relative to canvas CSS width
-  y: number; // Normalized 0..1 relative to canvas CSS height
-}
-
-export interface ScratchpadStroke {
-  tool: 'pen' | 'eraser';
-  points: ScratchpadPoint[];
-  width: number;
-  color?: string;
-}
+export type { ScratchpadPoint, ScratchpadStroke };
 
 interface ScratchpadOverlayProps {
   isOpen: boolean;

@@ -65,7 +65,11 @@ export const QuestionSolver: React.FC = () => {
   const {
     activeSession,
     isTransitioningExamModule,
+    examTransitionError,
     setDraftAnswer,
+    setQuestionHighlights,
+    setQuestionEliminated,
+    setQuestionScratchpad,
     submitAnswer,
     goToQuestionIndex,
     completeSession,
@@ -85,9 +89,6 @@ export const QuestionSolver: React.FC = () => {
   const [question, setQuestion] = useState<Question | null>(null);
   const [isLoadingQuestion, setIsLoadingQuestion] = useState<boolean>(true);
   const [questionError, setQuestionError] = useState<string | null>(null);
-  const [eliminatedMap, setEliminatedMap] = useState<Record<string, string[]>>({});
-  const [scratchpadMap, setScratchpadMap] = useState<Record<string, ScratchpadStroke[]>>({});
-  const [highlightMap, setHighlightMap] = useState<Record<string, PassageHighlight[]>>({});
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [calculatorLayout, setCalculatorLayout] =
@@ -114,8 +115,6 @@ export const QuestionSolver: React.FC = () => {
       const isSmUp = vw >= 640;
       setIsDesktopSmUp(isSmUp);
       if (!isSmUp) {
-        setIsCalculatorOpen(false);
-        setIsReferenceOpen(false);
         setIsScratchpadOpen(false);
       }
       setCalculatorDockWidth((prev) => {
@@ -156,6 +155,19 @@ export const QuestionSolver: React.FC = () => {
     if (!activeSession || !currentQuestionId) return null;
     return activeSession.questionStates[currentQuestionId] || null;
   }, [activeSession, currentQuestionId]);
+
+  const eliminatedMap = useMemo(
+    () => activeSession?.eliminatedByQuestion || {},
+    [activeSession?.eliminatedByQuestion]
+  );
+  const scratchpadMap = useMemo(
+    () => activeSession?.scratchpadByQuestion || {},
+    [activeSession?.scratchpadByQuestion]
+  );
+  const highlightMap = useMemo(
+    () => activeSession?.highlightsByQuestion || {},
+    [activeSession?.highlightsByQuestion]
+  );
 
   const isCompletedSession = Boolean(activeSession?.completedAt);
   const isExamMode = activeSession?.mode === 'exam' && Boolean(activeSession?.exam);
@@ -220,22 +232,30 @@ export const QuestionSolver: React.FC = () => {
 
     const interval = setInterval(() => {
       const now = Date.now();
-      const delta = now - lastTickRef.current;
-      if (delta > 0) {
+      const rawDelta = now - lastTickRef.current;
+      // Ignore long system-sleep jumps in untimed Topic Practice; keep strict clock in Live Exam
+      const delta = isLiveExam ? rawDelta : Math.min(rawDelta, 2000);
+      if (rawDelta > 0) {
         lastTickRef.current = now;
-        if (!isLiveExam || activeExam?.phase === 'testing') {
-          setQuestionTimerMs((prev) => prev + delta);
+        if (!isLiveExam && document.visibilityState === 'hidden') {
+          return;
         }
-        const trackedQId =
-          isLiveExam && activeExam?.phase !== 'testing' ? null : currentQuestionId;
-        syncSessionTime(delta, trackedQId, delta);
+        if (delta > 0) {
+          if (!isLiveExam || activeExam?.phase === 'testing') {
+            setQuestionTimerMs((prev) => prev + delta);
+          }
+          const trackedQId =
+            isLiveExam && activeExam?.phase !== 'testing' ? null : currentQuestionId;
+          syncSessionTime(delta, trackedQId, delta);
+        }
       }
     }, 250);
 
     const handleVisibilityChange = () => {
       const now = Date.now();
       if (document.visibilityState === 'hidden') {
-        const delta = now - lastTickRef.current;
+        const rawDelta = now - lastTickRef.current;
+        const delta = isLiveExam ? rawDelta : Math.min(rawDelta, 2000);
         if (delta > 0) {
           lastTickRef.current = now;
           if (!isLiveExam || activeExam?.phase === 'testing') {
@@ -280,7 +300,8 @@ export const QuestionSolver: React.FC = () => {
       (activeExam.phase === 'testing' || activeExam.phase === 'module-review') &&
       activeModule &&
       !activeModule.locked &&
-      activeModule.timeRemainingMs <= 0
+      activeModule.timeRemainingMs <= 0 &&
+      !examTransitionError
     ) {
       lockCurrentModuleAndAdvance().catch(() => {});
     }
@@ -289,6 +310,7 @@ export const QuestionSolver: React.FC = () => {
     activeExam,
     activeModule,
     isTransitioningExamModule,
+    examTransitionError,
     skipExamBreak,
     lockCurrentModuleAndAdvance,
   ]);
@@ -340,28 +362,28 @@ export const QuestionSolver: React.FC = () => {
       const currentElim = eliminatedMap[currentQuestionId] || [];
       const isNowEliminating = !currentElim.includes(label);
       soundEngine.play(isNowEliminating ? 'strikethrough' : 'restore');
-      setEliminatedMap((prev) => {
-        const current = prev[currentQuestionId] || [];
-        const next = current.includes(label)
-          ? current.filter((l) => l !== label)
-          : [...current, label];
-        return { ...prev, [currentQuestionId]: next };
-      });
+      const next = isNowEliminating
+        ? [...currentElim, label]
+        : currentElim.filter((l) => l !== label);
+      setQuestionEliminated(currentQuestionId, next);
       if (isNowEliminating && currentQuestionState.draftAnswer === label) {
         setDraftAnswer(currentQuestionId, '');
       }
     },
-    [currentQuestionId, currentQuestionState, eliminatedMap, setDraftAnswer]
+    [
+      currentQuestionId,
+      currentQuestionState,
+      eliminatedMap,
+      setQuestionEliminated,
+      setDraftAnswer,
+    ]
   );
 
   const handleUpdateScratchpadStrokes = useCallback(
     (qId: string, nextStrokes: ScratchpadStroke[]) => {
-      setScratchpadMap((prev) => ({
-        ...prev,
-        [qId]: nextStrokes,
-      }));
+      setQuestionScratchpad(qId, nextStrokes);
     },
-    []
+    [setQuestionScratchpad]
   );
 
   const handleToggleScratchpad = useCallback(() => {
@@ -374,12 +396,9 @@ export const QuestionSolver: React.FC = () => {
 
   const handleUpdateHighlights = useCallback(
     (qId: string, nextHighlights: PassageHighlight[]) => {
-      setHighlightMap((prev) => ({
-        ...prev,
-        [qId]: nextHighlights,
-      }));
+      setQuestionHighlights(qId, nextHighlights);
     },
-    []
+    [setQuestionHighlights]
   );
 
   const handleEscapeOverlays = useCallback((): boolean => {
@@ -483,7 +502,7 @@ export const QuestionSolver: React.FC = () => {
 
   const handleSprChange = (rawVal: string) => {
     if (currentQuestionState.isSubmitted) return;
-    const val = rawVal.trim().replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
+    const val = rawVal.trim().replace(/,/g, '');
     if (!/^-?[0-9./]*$/.test(val)) return;
     if (val.startsWith('/') || val.startsWith('-/')) return;
     const maxLen = val.startsWith('-') ? 6 : 5;
@@ -576,7 +595,7 @@ export const QuestionSolver: React.FC = () => {
                 : questionTimerMs;
 
               const timerColorClass =
-                isLiveExam && !isTimerHidden
+                isLiveExam && !isTimerHidden && activeExam?.phase !== 'break'
                   ? displayMs <= 60_000
                     ? 'text-red-400'
                     : displayMs <= 5 * 60_000
@@ -586,7 +605,7 @@ export const QuestionSolver: React.FC = () => {
 
               return (
                 <span
-                  className={`font-mono text-lg sm:text-xl font-medium tabular-nums tracking-tight ${timerColorClass}`}
+                  className={`font-mono text-base sm:text-xl font-medium tabular-nums tracking-tight ${timerColorClass}`}
                   title={isLiveExam ? 'Time remaining' : 'Question elapsed time'}
                 >
                   {isTimerHidden ? '—' : formatDuration(displayMs)}
@@ -650,10 +669,10 @@ export const QuestionSolver: React.FC = () => {
             )}
           </div>
 
-          {/* Right: Desktop/Tablet Tools (Calculator, Reference, Scratchpad) + Share */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          {/* Right: Workspace Tools (Calculator, Reference on all screens; Scratchpad sm+) + Share */}
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1.5">
             {(!isLiveExam || (activeExam?.phase === 'testing' && !activeExam?.isExamPaused)) && (
-              <div className="hidden sm:flex items-center gap-1.5">
+              <div className="flex items-center gap-0.5 sm:gap-1.5">
                 {isMathSubject && (
                   <>
                     <button
@@ -665,7 +684,7 @@ export const QuestionSolver: React.FC = () => {
                           return next;
                         });
                       }}
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                      className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                         isCalculatorOpen
                           ? 'bg-[#18181B] text-[#69ff00]'
                           : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -687,7 +706,7 @@ export const QuestionSolver: React.FC = () => {
                           return next;
                         });
                       }}
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                      className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                         isReferenceOpen
                           ? 'bg-[#18181B] text-[#69ff00]'
                           : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -702,11 +721,11 @@ export const QuestionSolver: React.FC = () => {
                   </>
                 )}
 
-                {/* Scratchpad Toggle Button */}
+                {/* Scratchpad Toggle Button (Desktop/Tablet sm+) */}
                 <button
                   type="button"
                   onClick={handleToggleScratchpad}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
+                  className={`hidden sm:inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
                     isScratchpadOpen
                       ? 'bg-[#18181B] text-[#69ff00]'
                       : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
@@ -775,7 +794,7 @@ export const QuestionSolver: React.FC = () => {
       />
 
       {/* Full-Screen Examination Area (between Header and Footer) */}
-      <main
+      <div
         style={{
           paddingLeft:
             isCalculatorDocked && isTestingPhase && !activeExam?.isExamPaused && calculatorLayout === 'left'
@@ -832,6 +851,8 @@ export const QuestionSolver: React.FC = () => {
               (activeExam.track !== 'full' || activeModule.subject === 'math')
             }
             isTransitioning={isTransitioningExamModule}
+            isTimeExpired={activeModule.timeRemainingMs <= 0}
+            transitionError={examTransitionError}
             onJumpToQuestion={(idx) => goToQuestionIndex(idx)}
             onBackToLastQuestion={() => goToQuestionIndex(activeModule.questionIds.length - 1)}
             onSubmitModule={() => lockCurrentModuleAndAdvance()}
@@ -1072,24 +1093,7 @@ export const QuestionSolver: React.FC = () => {
                     return (
                       <div
                         key={opt.id}
-                        role="button"
-                        tabIndex={isSubmitted || isEliminated ? -1 : 0}
-                        aria-disabled={isSubmitted || isEliminated}
-                        aria-pressed={isSelected}
-                        onClick={() => handleSelectMcq(opt.label)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleSelectMcq(opt.label);
-                          }
-                        }}
-                        className={`group relative flex items-center gap-4 rounded-2xl border p-4 transition-all duration-150 ${optionSurface} ${
-                          isSubmitted
-                            ? 'cursor-default'
-                            : isEliminated
-                            ? 'cursor-not-allowed'
-                            : 'cursor-pointer'
-                        }`}
+                        className={`group relative flex items-center rounded-2xl border transition-all duration-150 ${optionSurface}`}
                       >
                         {/* Full-width visual cross-out line that strikes across text, KaTeX equations, SVGs, and image formulas alike */}
                         {isEliminated && (
@@ -1099,61 +1103,81 @@ export const QuestionSolver: React.FC = () => {
                           />
                         )}
 
-                        <div
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-xs transition-all ${badgeStyle} ${
-                            isEliminated ? 'opacity-40' : ''
+                        <button
+                          type="button"
+                          disabled={isSubmitted || isEliminated}
+                          aria-pressed={isSelected}
+                          onClick={() => handleSelectMcq(opt.label)}
+                          className={`flex flex-1 min-w-0 items-center gap-4 rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-[-2px] ${
+                            isSubmitted
+                              ? 'cursor-default'
+                              : isEliminated
+                              ? 'cursor-not-allowed'
+                              : 'cursor-pointer'
                           }`}
                         >
-                          {opt.label}
-                        </div>
-
-                        <div
-                          className={`flex-1 transition-opacity ${
-                            isEliminated
-                              ? 'opacity-40 grayscale select-none'
-                              : ''
-                          }`}
-                        >
-                          <RichMathContent
-                            html={opt.content}
-                            variant="option"
-                          />
-                        </div>
-
-                        {isSubmitted ? (
-                          isCorrectOption ? (
-                            <Check className="h-4 w-4 shrink-0 text-emerald-400" />
-                          ) : isSelected ? (
-                            <X className="h-4 w-4 shrink-0 text-red-400" />
-                          ) : null
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) =>
-                              toggleEliminateOption(opt.label, e)
-                            }
-                            title={
-                              isEliminated
-                                ? `Restore answer choice ${opt.label} (Shift+${opt.label})`
-                                : `Cross out answer choice ${opt.label} (Shift+${opt.label})`
-                            }
-                            aria-label={
-                              isEliminated
-                                ? `Restore answer choice ${opt.label}`
-                                : `Cross out answer choice ${opt.label}`
-                            }
-                            className={`relative z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all cursor-pointer ${
-                              isEliminated
-                                ? 'text-white opacity-100 hover:bg-[#1F1F23] hover:text-white'
-                                : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
+                          <div
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-xs transition-all ${badgeStyle} ${
+                              isEliminated ? 'opacity-40' : ''
                             }`}
                           >
-                            {isEliminated ? (
-                              <Undo2 className="h-4 w-4" />
-                            ) : (
-                              <Ban className="h-4 w-4" />
-                            )}
-                          </button>
+                            {opt.label}
+                          </div>
+
+                          <div
+                            className={`flex-1 min-w-0 transition-opacity ${
+                              isEliminated
+                                ? 'opacity-40 grayscale select-none'
+                                : ''
+                            }`}
+                          >
+                            <RichMathContent
+                              html={opt.content}
+                              variant="option"
+                            />
+                          </div>
+                        </button>
+
+                        {isSubmitted ? (
+                          isCorrectOption || isSelected ? (
+                            <div className="pr-4 shrink-0">
+                              {isCorrectOption ? (
+                                <Check className="h-4 w-4 text-emerald-400" />
+                              ) : (
+                                <X className="h-4 w-4 text-red-400" />
+                              )}
+                            </div>
+                          ) : null
+                        ) : (
+                          <div className="pr-3 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                toggleEliminateOption(opt.label, e)
+                              }
+                              title={
+                                isEliminated
+                                  ? `Restore answer choice ${opt.label} (Shift+${opt.label})`
+                                  : `Cross out answer choice ${opt.label} (Shift+${opt.label})`
+                              }
+                              aria-label={
+                                isEliminated
+                                  ? `Restore answer choice ${opt.label}`
+                                  : `Cross out answer choice ${opt.label}`
+                              }
+                              className={`relative z-20 flex h-7 w-7 items-center justify-center rounded-full transition-all cursor-pointer ${
+                                isEliminated
+                                  ? 'text-white opacity-100 hover:bg-[#1F1F23] hover:text-white'
+                                  : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
+                              }`}
+                            >
+                              {isEliminated ? (
+                                <Undo2 className="h-4 w-4" />
+                              ) : (
+                                <Ban className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -1377,7 +1401,7 @@ export const QuestionSolver: React.FC = () => {
         )}
         </div>
         )}
-      </main>
+      </div>
 
       {/* Bottom Examination Navigation Bar */}
       {(!isLiveExam || (activeExam?.phase === 'testing' && !activeExam?.isExamPaused)) && (

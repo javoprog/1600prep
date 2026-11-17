@@ -12,7 +12,7 @@ export function formatDuration(ms: number): string {
 }
 
 export function formatShortDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   if (totalSeconds < 60) {
     return `${totalSeconds}s`;
   }

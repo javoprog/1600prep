@@ -8,17 +8,11 @@ import React, {
   useState,
 } from 'react';
 import { Check, Trash2 } from 'lucide-react';
+import type { HighlightColor, PassageHighlight } from '@/types';
 import { RichMathContent } from '@/components/question/RichMathContent';
 import { soundEngine } from '@/services/sound/soundEngine';
 
-export type HighlightColor = 'yellow' | 'green' | 'blue' | 'red';
-
-export interface PassageHighlight {
-  id: string;
-  start: number;
-  end: number;
-  color: HighlightColor;
-}
+export type { HighlightColor, PassageHighlight };
 
 export const HIGHLIGHT_COLORS: ReadonlyArray<{
   id: HighlightColor;

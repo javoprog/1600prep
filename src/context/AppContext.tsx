@@ -14,10 +14,12 @@ import {
   ExamPhase,
   ExamTrack,
   HomePracticeTab,
+  PassageHighlight,
   PracticeFilters,
   PracticeMode,
   Question,
   QuestionMeta,
+  ScratchpadStroke,
   Session,
   SessionQuestionState,
   TaxonomyData,
@@ -76,6 +78,8 @@ interface AppContextValue {
   activeSession: Session | null;
   savedResumeExam: Session | null;
   isTransitioningExamModule: boolean;
+  examTransitionError: string | null;
+  clearExamTransitionError: () => void;
   isSessionSummaryView: boolean;
   setIsSessionSummaryView: (val: boolean) => void;
   startPracticeSession: (
@@ -95,6 +99,15 @@ interface AppContextValue {
   skipExamBreak: () => void;
   lockCurrentModuleAndAdvance: () => Promise<void>;
   setDraftAnswer: (questionId: string, draft: string) => void;
+  setQuestionHighlights: (
+    questionId: string,
+    highlights: PassageHighlight[]
+  ) => void;
+  setQuestionEliminated: (questionId: string, eliminated: string[]) => void;
+  setQuestionScratchpad: (
+    questionId: string,
+    strokes: ScratchpadStroke[]
+  ) => void;
   submitAnswer: (question: Question) => Promise<Attempt | null>;
   goToQuestionIndex: (index: number) => void;
   completeSession: () => Promise<void>;
@@ -112,6 +125,45 @@ function generateId(): string {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function fetchQuestionDetailsWithRetry(
+  questionIds: string[],
+  concurrency = 5
+): Promise<{ detailMap: Map<string, Question>; failedIds: string[] }> {
+  const detailMap = new Map<string, Question>();
+  const failedIds: string[] = [];
+  if (questionIds.length === 0) {
+    return { detailMap, failedIds };
+  }
+
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < questionIds.length) {
+      const idx = cursor++;
+      const qId = questionIds[idx];
+      let resolved: Question | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          resolved = await fetchQuestionDetail(qId);
+          break;
+        } catch {
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, 350));
+          }
+        }
+      }
+      if (resolved) {
+        detailMap.set(qId, resolved);
+      } else {
+        failedIds.push(qId);
+      }
+    }
+  };
+
+  const workerCount = Math.min(concurrency, questionIds.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return { detailMap, failedIds };
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -133,6 +185,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [savedResumeExam, setSavedResumeExam] = useState<Session | null>(null);
   const [isTransitioningExamModule, setIsTransitioningExamModule] =
     useState<boolean>(false);
+  const [examTransitionError, setExamTransitionError] = useState<string | null>(
+    null
+  );
   const [isSessionSummaryView, setIsSessionSummaryView] =
     useState<boolean>(false);
   const activeSessionRef = useRef<Session | null>(null);
@@ -195,6 +250,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const drafts = activeSession.questionIds
       .map((id) => activeSession.questionStates[id]?.draftAnswer || '')
       .join('\u0001');
+    const hlSig = Object.entries(activeSession.highlightsByQuestion || {})
+      .map(([id, list]) => `${id}:${list.map((h) => `${h.start}-${h.end}-${h.color}`).join(',')}`)
+      .join(';');
+    const elimSig = Object.entries(activeSession.eliminatedByQuestion || {})
+      .map(([id, list]) => `${id}:${list.join('')}`)
+      .join(';');
+    const scratchSig = Object.entries(activeSession.scratchpadByQuestion || {})
+      .map(([id, list]) => `${id}:${list.length}`)
+      .join(';');
     return [
       activeSession.id,
       activeSession.currentIndex,
@@ -203,6 +267,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       activeSession.exam.isExamPaused ? '1' : '0',
       activeSession.exam.flaggedQuestionIds.join(','),
       drafts,
+      hlSig,
+      elimSig,
+      scratchSig,
     ].join('|');
   }, [activeSession]);
 
@@ -322,11 +389,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         currentIndex: 0,
         maxVisitedIndex: 0,
         questionStates,
+        highlightsByQuestion: {},
+        eliminatedByQuestion: {},
+        scratchpadByQuestion: {},
         startedAt: Date.now(),
         totalTime: 0,
         isPaused: false,
       };
 
+      setExamTransitionError(null);
       setActiveSession(newSession);
       setIsSessionSummaryView(false);
 
@@ -438,6 +509,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         startedAt: Date.now(),
         totalTime: 0,
         isPaused: false,
+        highlightsByQuestion: {},
+        eliminatedByQuestion: {},
+        scratchpadByQuestion: {},
         exam: {
           track,
           phase: 'testing',
@@ -449,6 +523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       };
 
+      setExamTransitionError(null);
       setSavedResumeExam(null);
       setActiveSession(newSession);
       setIsSessionSummaryView(false);
@@ -460,6 +535,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     [metas]
   );
 
+  const clearExamTransitionError = useCallback(() => {
+    setExamTransitionError(null);
+  }, []);
+
   const resumeSavedExam = useCallback(() => {
     if (!savedResumeExam || !savedResumeExam.exam) return;
     const resumed: Session = {
@@ -470,6 +549,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         isExamPaused: false,
       },
     };
+    setExamTransitionError(null);
     setSavedResumeExam(null);
     setActiveSession(resumed);
     setIsSessionSummaryView(false);
@@ -498,6 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       },
     };
     await saveActiveExamSession(pausedSnapshot);
+    setExamTransitionError(null);
     setSavedResumeExam(pausedSnapshot);
     setHomeTab('full');
     setActiveSession(null);
@@ -510,6 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       clearActiveExamSession().catch(() => {});
       setSavedResumeExam(null);
     }
+    setExamTransitionError(null);
     setActiveSession(null);
     setIsSessionSummaryView(false);
     if (typeof window !== 'undefined' && window.location.search) {
@@ -563,6 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const setExamPhase = useCallback((phase: ExamPhase) => {
+    setExamTransitionError(null);
     setActiveSession((prev) => {
       if (!prev || prev.mode !== 'exam' || !prev.exam || prev.completedAt) {
         return prev;
@@ -613,21 +696,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     isTransitioningModuleRef.current = true;
     setIsTransitioningExamModule(true);
+    setExamTransitionError(null);
 
     try {
-      // Grade all items in the active module silently
+      // Grade all answered items in the active module with bounded concurrency & retry
       const answeredIds = currentMod.questionIds.filter((qId) => {
         const draft = currentSess.questionStates[qId]?.draftAnswer.trim();
         return Boolean(draft);
       });
 
-      const fetchedQuestions = await Promise.all(
-        answeredIds.map((qId) => fetchQuestionDetail(qId).catch(() => null))
-      );
-      const qDetailMap = new Map<string, Question>();
-      fetchedQuestions.forEach((q) => {
-        if (q) qDetailMap.set(q.id, q);
-      });
+      const { detailMap: qDetailMap, failedIds } =
+        await fetchQuestionDetailsWithRetry(answeredIds, 5);
+
+      if (failedIds.length > 0) {
+        setExamTransitionError(
+          `Unable to verify ${failedIds.length} answered question${
+            failedIds.length > 1 ? 's' : ''
+          } due to a network error. Please check your connection and try submitting again.`
+        );
+        // Ensure auto-submitted expired modules land on the review screen instead of staying stuck in testing
+        setActiveSession((prev) => {
+          if (
+            !prev ||
+            prev.id !== currentSess.id ||
+            prev.mode !== 'exam' ||
+            !prev.exam ||
+            prev.exam.phase === 'module-review'
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            exam: {
+              ...prev.exam,
+              phase: 'module-review',
+            },
+          };
+        });
+        return;
+      }
 
       const nextStates: Record<string, SessionQuestionState> = {
         ...currentSess.questionStates,
@@ -832,6 +939,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  const setQuestionHighlights = useCallback(
+    (questionId: string, highlights: PassageHighlight[]) => {
+      setActiveSession((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          highlightsByQuestion: {
+            ...(prev.highlightsByQuestion || {}),
+            [questionId]: highlights,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setQuestionEliminated = useCallback(
+    (questionId: string, eliminated: string[]) => {
+      setActiveSession((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          eliminatedByQuestion: {
+            ...(prev.eliminatedByQuestion || {}),
+            [questionId]: eliminated,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setQuestionScratchpad = useCallback(
+    (questionId: string, strokes: ScratchpadStroke[]) => {
+      setActiveSession((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          scratchpadByQuestion: {
+            ...(prev.scratchpadByQuestion || {}),
+            [questionId]: strokes,
+          },
+        };
+      });
+    },
+    []
+  );
+
   const submitAnswer = useCallback(
     async (question: Question): Promise<Attempt | null> => {
       const currentSess = activeSessionRef.current;
@@ -882,6 +1037,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const goToQuestionIndex = useCallback((index: number) => {
+    setExamTransitionError(null);
     setActiveSession((prev) => {
       if (!prev) return prev;
       const clamped = Math.max(0, Math.min(prev.questionIds.length - 1, index));
@@ -1036,6 +1192,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       activeSession,
       savedResumeExam,
       isTransitioningExamModule,
+      examTransitionError,
+      clearExamTransitionError,
       isSessionSummaryView,
       setIsSessionSummaryView,
       startPracticeSession,
@@ -1050,6 +1208,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       skipExamBreak,
       lockCurrentModuleAndAdvance,
       setDraftAnswer,
+      setQuestionHighlights,
+      setQuestionEliminated,
+      setQuestionScratchpad,
       submitAnswer,
       goToQuestionIndex,
       completeSession,
@@ -1071,6 +1232,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       activeSession,
       savedResumeExam,
       isTransitioningExamModule,
+      examTransitionError,
+      clearExamTransitionError,
       isSessionSummaryView,
       startPracticeSession,
       startFullExam,
@@ -1084,6 +1247,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       skipExamBreak,
       lockCurrentModuleAndAdvance,
       setDraftAnswer,
+      setQuestionHighlights,
+      setQuestionEliminated,
+      setQuestionScratchpad,
       submitAnswer,
       goToQuestionIndex,
       completeSession,

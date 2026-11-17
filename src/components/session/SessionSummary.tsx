@@ -393,14 +393,15 @@ export const SessionSummary: React.FC = () => {
             const diff = getDifficultyBadgeInfo(meta?.difficulty);
 
             return (
-              <div
+              <button
                 key={qId}
+                type="button"
                 onClick={() => {
                   soundEngine.play('click');
                   goToQuestionIndex(idx);
                   setIsSessionSummaryView(false);
                 }}
-                className="group flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#18181B] transition-colors cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                className="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-[#18181B] transition-colors cursor-pointer first:rounded-t-2xl last:rounded-b-2xl focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-[-2px]"
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <span className="font-mono text-xs text-[#71717A] w-6">
@@ -446,7 +447,7 @@ export const SessionSummary: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

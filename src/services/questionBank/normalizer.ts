@@ -421,8 +421,10 @@ export function extractDisclosedSprAnswers(rationaleHtml?: string): string[] {
     }
   }
 
-  // 2. Check "The correct answer is ..."
-  const firstSentMatch = textWithAlts.match(/The correct answer is\s+([^.]+(?:\.\d+)?)/i);
+  // 2. Check "The correct answer is ..." (preserve decimal points inside numbers like 1.5 or 2.5)
+  const firstSentMatch = textWithAlts.match(
+    /The correct answer is\s+((?:\.\d|[^.])+)/i
+  );
   if (firstSentMatch && firstSentMatch[1]) {
     const rawAns = firstSentMatch[1].trim();
 
@@ -510,6 +512,13 @@ export function isValidCompleteSprFormat(input: string): boolean {
     return false;
   }
   return parseNumericValue(cleaned) !== null;
+}
+
+export function isIncompleteSprDraft(draft?: string): boolean {
+  const cleaned = (draft || '').trim();
+  if (!cleaned) return false;
+  if (/^[A-D]$/i.test(cleaned)) return false;
+  return !isValidCompleteSprFormat(cleaned);
 }
 
 export function parseNumericValue(input: string): number | null {

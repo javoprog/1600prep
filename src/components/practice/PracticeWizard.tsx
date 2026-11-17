@@ -613,6 +613,10 @@ export const PracticeWizard: React.FC = () => {
                     }
                   }}
                   disabled={s > step}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  aria-label={`${stepLabel} (Step ${s} of 2)${
+                    isPast ? ' — completed' : isCurrent ? ' — current' : ''
+                  }`}
                   className={`inline-flex items-center gap-2 text-xs font-medium transition-colors ${
                     isCurrent
                       ? 'text-[#F5F5F5]'
@@ -789,9 +793,11 @@ export const PracticeWizard: React.FC = () => {
 
               return (
                 <div key={dom.primaryClassCd} className="p-5 sm:p-6">
-                  <div
+                  <button
+                    type="button"
+                    aria-pressed={isAllDomSkillsSelected}
                     onClick={() => toggleDomain(dom.primaryClassCd)}
-                    className="flex items-start justify-between gap-4 cursor-pointer"
+                    className="flex w-full items-start justify-between gap-4 rounded-xl text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
                   >
                     <div className="flex items-start gap-3.5">
                       <div
@@ -816,7 +822,7 @@ export const PracticeWizard: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
 
                   <div className="mt-4 ml-8 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {dom.skills.map((sk) => {
@@ -825,6 +831,8 @@ export const PracticeWizard: React.FC = () => {
                         <button
                           key={sk.id}
                           type="button"
+                          title={sk.text}
+                          aria-pressed={isSkSelected}
                           onClick={() =>
                             toggleSkill(sk.code, dom.primaryClassCd)
                           }
@@ -985,7 +993,10 @@ export const PracticeWizard: React.FC = () => {
                     <span>Starting...</span>
                   </>
                 ) : (
-                  <span>Start Practice!</span>
+                  <>
+                    <span>Start Practice</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </>
                 )}
               </Button3D>
             </div>

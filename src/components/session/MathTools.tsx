@@ -46,6 +46,20 @@ const KatexFormula: React.FC<{ tex: string; className?: string }> = ({
   />
 );
 
+function clampWindowPosition(
+  pos: WindowPosition,
+  approxWidth: number
+): WindowPosition {
+  if (typeof window === 'undefined') return pos;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const clampedW = Math.min(approxWidth, vw - 24);
+  return {
+    x: Math.max(12, Math.min(pos.x, vw - clampedW - 12)),
+    y: Math.max(64, Math.min(pos.y, vh - 120)),
+  };
+}
+
 function useDraggableWindow(initialPosition: WindowPosition, approxWidth = 600) {
   const [pos, setPos] = useState<WindowPosition>(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
@@ -62,12 +76,12 @@ function useDraggableWindow(initialPosition: WindowPosition, approxWidth = 600) 
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setPos((prev) => {
-      const clampedW = Math.min(approxWidth, window.innerWidth - 24);
-      const x = Math.max(12, Math.min(prev.x, window.innerWidth - clampedW - 12));
-      const y = Math.max(60, Math.min(prev.y, window.innerHeight - 200));
-      return { x, y };
-    });
+    const syncBounds = () => {
+      setPos((prev) => clampWindowPosition(prev, approxWidth));
+    };
+    syncBounds();
+    window.addEventListener('resize', syncBounds);
+    return () => window.removeEventListener('resize', syncBounds);
   }, [approxWidth]);
 
   const startDrag = useCallback(
@@ -222,6 +236,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 }) => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isDesmosDark, setIsDesmosDark] = useState(true);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [bounds, setBounds] = useState<WindowBounds>({
     x: 24,
     y: 76,
@@ -246,15 +261,23 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setBounds((prev) => {
-      const maxW = Math.max(minFloatWidth, window.innerWidth - 24);
-      const maxH = Math.max(minFloatHeight, window.innerHeight - 96);
-      const width = Math.min(prev.width, maxW);
-      const height = Math.min(prev.height, maxH);
-      const x = Math.max(12, Math.min(prev.x, window.innerWidth - width - 12));
-      const y = Math.max(68, Math.min(prev.y, window.innerHeight - height - 12));
-      return { x, y, width, height };
-    });
+    const syncViewportAndBounds = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      setIsMobileViewport(vw < 640);
+      setBounds((prev) => {
+        const maxW = Math.max(minFloatWidth, vw - 24);
+        const maxH = Math.max(minFloatHeight, vh - 96);
+        const width = Math.min(prev.width, maxW);
+        const height = Math.min(prev.height, maxH);
+        const x = Math.max(12, Math.min(prev.x, vw - width - 12));
+        const y = Math.max(68, Math.min(prev.y, vh - height - 12));
+        return { x, y, width, height };
+      });
+    };
+    syncViewportAndBounds();
+    window.addEventListener('resize', syncViewportAndBounds);
+    return () => window.removeEventListener('resize', syncViewportAndBounds);
   }, []);
 
   useEffect(() => {
@@ -265,6 +288,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 
   const handleHeaderPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (isMobileViewport) return;
       if ((e.target as HTMLElement).closest('button, a')) return;
       e.preventDefault();
 
@@ -462,9 +486,16 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
     return null;
   }
 
-  const isDocked = layout !== 'floating';
+  const isDocked = !isMobileViewport && layout !== 'floating';
 
-  const panelStyle: React.CSSProperties = isDocked
+  const panelStyle: React.CSSProperties = isMobileViewport
+    ? {
+        left: '8px',
+        right: '8px',
+        top: '68px',
+        bottom: `${footerHeight + 8}px`,
+      }
+    : isDocked
     ? {
         top: '64px',
         bottom: `${footerHeight}px`,
@@ -510,13 +541,13 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
             : 'z-40 rounded-2xl border border-[#3F3F46] shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
         } ${
           isOpen
-            ? 'hidden sm:flex opacity-100 pointer-events-auto'
+            ? 'flex opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none hidden'
         }`}
         role="dialog"
         aria-label="Graphing Calculator"
       >
-        {!isDocked && (
+        {!isDocked && !isMobileViewport && (
           <ResizeHandles onStartResize={handleStartFloatingResize} />
         )}
 
@@ -538,6 +569,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
         <div
           onPointerDown={handleHeaderPointerDown}
           onDoubleClick={(e) => {
+            if (isMobileViewport) return;
             if ((e.target as HTMLElement).closest('button, a')) return;
             soundEngine.play('click');
             if (layout === 'floating') {
@@ -547,12 +579,14 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
               onChangeLayout('floating');
             }
           }}
-          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3.5 py-2 cursor-move ${
-            isDocked ? '' : 'rounded-t-2xl'
-          }`}
+          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3.5 py-2 ${
+            isMobileViewport ? '' : 'cursor-move'
+          } ${isDocked ? '' : 'rounded-t-2xl'}`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <GripHorizontal className="h-4 w-4 shrink-0 text-[#71717A]" />
+            {!isMobileViewport && (
+              <GripHorizontal className="h-4 w-4 shrink-0 text-[#71717A]" />
+            )}
             <span className="text-xs font-semibold text-[#F5F5F5] truncate">
               Calculator
             </span>
@@ -640,7 +674,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
     {
       x:
         typeof window !== 'undefined'
-          ? Math.max(24, window.innerWidth - 710)
+          ? Math.max(12, window.innerWidth - 710)
           : 180,
       y: 72,
     },
@@ -655,7 +689,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 hidden sm:flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#141417] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Reference Sheet"
     >
@@ -897,7 +931,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
     {
       x:
         typeof window !== 'undefined'
-          ? Math.max(24, Math.round((window.innerWidth - 580) / 2))
+          ? Math.max(12, Math.round((window.innerWidth - 580) / 2))
           : 220,
       y: 84,
     },
@@ -912,7 +946,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
         left: `${pos.x}px`,
         top: `${pos.y}px`,
       }}
-      className="fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-80px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#141417] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      className="fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
       role="dialog"
       aria-label="Student-Produced Response Directions"
     >
@@ -975,8 +1009,8 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
           <div className="mb-2 text-xs font-semibold text-[#A1A1AA]">
             Examples
           </div>
-          <div className="overflow-hidden rounded-2xl border border-[#29292E]">
-            <table className="w-full border-collapse text-left text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-[#29292E]">
+            <table className="w-full min-w-[420px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[#29292E] bg-[#18181B] text-[#E4E4E7]">
                   <th className="px-3.5 py-2.5 font-medium">Answer</th>

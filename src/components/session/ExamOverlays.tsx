@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
+  AlertCircle,
   ArrowRight,
   Clock,
   Coffee,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ExamModuleState, SessionQuestionState } from '@/types';
 import { Button3D } from '@/components/ui/Button3D';
+import { isIncompleteSprDraft } from '@/services/questionBank/normalizer';
 import { formatDuration } from '@/utils/formatTime';
 import { soundEngine } from '@/services/sound/soundEngine';
 
@@ -24,6 +26,7 @@ interface QuestionTileButtonProps {
   isCurrent?: boolean;
   isFlagged?: boolean;
   isReviewMode?: boolean;
+  disabled?: boolean;
   onSelect: (index: number) => void;
 }
 
@@ -34,9 +37,12 @@ const QuestionTileButton: React.FC<QuestionTileButtonProps> = ({
   isCurrent = false,
   isFlagged = false,
   isReviewMode = false,
+  disabled = false,
   onSelect,
 }) => {
-  const isAnswered = Boolean(state?.draftAnswer.trim() || state?.submittedAnswer);
+  const rawDraftOrSub = state?.draftAnswer.trim() || state?.submittedAnswer || '';
+  const isIncomplete = !isReviewMode && isIncompleteSprDraft(rawDraftOrSub);
+  const isAnswered = Boolean(rawDraftOrSub) && !isIncomplete;
 
   let tileClass =
     'border-[#29292E] bg-[#0A0A0B] text-[#71717A] hover:border-[#3F3F46] hover:text-[#F5F5F5]';
@@ -45,6 +51,9 @@ const QuestionTileButton: React.FC<QuestionTileButtonProps> = ({
     tileClass = state.isCorrect
       ? 'border-emerald-500/45 bg-emerald-500/12 text-emerald-300 hover:border-emerald-400'
       : 'border-red-500/45 bg-red-500/12 text-red-300 hover:border-red-400';
+  } else if (isIncomplete) {
+    tileClass =
+      'border-amber-500/50 bg-amber-500/10 text-amber-300 hover:border-amber-400';
   } else if (isAnswered) {
     tileClass =
       'border-[#52525B] bg-[#27272A] text-[#F5F5F5] hover:border-[#71717A]';
@@ -62,12 +71,22 @@ const QuestionTileButton: React.FC<QuestionTileButtonProps> = ({
     <button
       key={questionId}
       type="button"
+      disabled={disabled}
       onClick={() => {
+        if (disabled) return;
         soundEngine.play('click');
         onSelect(index);
       }}
-      title={`Question ${index + 1}${isAnswered ? ' (Answered)' : ' (Unanswered)'}${isFlagged ? ' • Flagged' : ''}`}
-      className={`relative flex h-9 w-9 items-center justify-center rounded-full border font-mono text-xs tabular-nums transition-colors cursor-pointer ${tileClass}`}
+      title={`Question ${index + 1}${
+        isIncomplete
+          ? ' (Incomplete entry)'
+          : isAnswered
+          ? ' (Answered)'
+          : ' (Unanswered)'
+      }${isFlagged ? ' • Flagged' : ''}`}
+      className={`relative flex h-9 w-9 items-center justify-center rounded-full border font-mono text-xs tabular-nums transition-colors ${
+        disabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+      } ${tileClass}`}
     >
       <span>{index + 1}</span>
       {isFlagged && (
@@ -201,6 +220,8 @@ interface ExamModuleReviewScreenProps {
   flaggedQuestionIds: string[];
   isFinalModule: boolean;
   isTransitioning: boolean;
+  isTimeExpired?: boolean;
+  transitionError?: string | null;
   onJumpToQuestion: (index: number) => void;
   onBackToLastQuestion: () => void;
   onSubmitModule: () => void;
@@ -212,15 +233,22 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
   flaggedQuestionIds,
   isFinalModule,
   isTransitioning,
+  isTimeExpired = false,
+  transitionError = null,
   onJumpToQuestion,
   onBackToLastQuestion,
   onSubmitModule,
 }) => {
   const flaggedSet = new Set(flaggedQuestionIds);
-  const answeredCount = activeModule.questionIds.filter((id) =>
-    Boolean(questionStates[id]?.draftAnswer.trim())
+  const incompleteCount = activeModule.questionIds.filter((id) =>
+    isIncompleteSprDraft(questionStates[id]?.draftAnswer)
   ).length;
-  const unansweredCount = activeModule.questionIds.length - answeredCount;
+  const answeredCount = activeModule.questionIds.filter((id) => {
+    const draft = questionStates[id]?.draftAnswer.trim();
+    return Boolean(draft) && !isIncompleteSprDraft(draft);
+  }).length;
+  const unansweredCount =
+    activeModule.questionIds.length - answeredCount - incompleteCount;
   const flaggedInModCount = activeModule.questionIds.filter((id) =>
     flaggedSet.has(id)
   ).length;
@@ -241,6 +269,11 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
               </strong>{' '}
               answered
             </span>
+            {incompleteCount > 0 && (
+              <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-0.5 text-amber-300 tabular-nums">
+                {incompleteCount} incomplete
+              </span>
+            )}
             {unansweredCount > 0 && (
               <span className="rounded-full border border-[#29292E] bg-[#111113] px-2.5 py-0.5 text-[#A1A1AA] tabular-nums">
                 {unansweredCount} unanswered
@@ -258,11 +291,12 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
         {/* Review Body */}
         <div className="p-6 sm:p-7">
           <h2 className="font-editorial text-2xl text-[#F5F5F5]">
-            Check Your Work
+            {isTimeExpired ? 'Module Time Expired' : 'Check Your Work'}
           </h2>
           <p className="mt-1.5 text-xs text-[#A1A1AA] leading-relaxed">
-            Click any question number below to review or edit your answer before
-            locking this module.
+            {isTimeExpired
+              ? 'Time has ended for this module. Submit to grade your answers and continue.'
+              : 'Click any question number below to review or edit your answer before locking this module.'}
           </p>
 
           <div className="mt-6 grid grid-cols-6 sm:grid-cols-9 justify-items-center gap-3">
@@ -273,6 +307,7 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
                 index={idx}
                 state={questionStates[qId]}
                 isFlagged={flaggedSet.has(qId)}
+                disabled={isTimeExpired}
                 onSelect={onJumpToQuestion}
               />
             ))}
@@ -283,6 +318,12 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
               <span className="h-2.5 w-2.5 rounded-full border border-[#52525B] bg-[#27272A]" />
               <span>Answered</span>
             </span>
+            {incompleteCount > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full border border-amber-500/50 bg-amber-500/10" />
+                <span>Incomplete</span>
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full border border-[#29292E] bg-[#0A0A0B]" />
               <span>Unanswered</span>
@@ -292,21 +333,43 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
               <span>Flagged</span>
             </span>
           </div>
+
+          {!isTimeExpired && incompleteCount > 0 && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-300 shrink-0 mt-0.5" />
+              <span>
+                {incompleteCount} numeric entry{incompleteCount > 1 ? ' items appear' : ' appears'} incomplete (for example, a trailing slash or minus sign) and will not receive credit unless finished.
+              </span>
+            </div>
+          )}
+
+          {transitionError && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-[#4C2024] bg-[#201214] px-4 py-3 text-xs text-red-200">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+              <span>{transitionError}</span>
+            </div>
+          )}
         </div>
 
         {/* Consistent Action Footer Band */}
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 border-t border-[#1F1F23] bg-[#141417] px-5 py-4 sm:px-6">
-          <Button3D
-            variant="secondary"
-            size="md"
-            disabled={isTransitioning}
-            onClick={() => {
-              soundEngine.play('click');
-              onBackToLastQuestion();
-            }}
-          >
-            <span>Return to Module</span>
-          </Button3D>
+        <div
+          className={`flex flex-col-reverse sm:flex-row sm:items-center gap-3 border-t border-[#1F1F23] bg-[#141417] px-5 py-4 sm:px-6 ${
+            isTimeExpired ? 'justify-end' : 'justify-between'
+          }`}
+        >
+          {!isTimeExpired && (
+            <Button3D
+              variant="secondary"
+              size="md"
+              disabled={isTransitioning}
+              onClick={() => {
+                soundEngine.play('click');
+                onBackToLastQuestion();
+              }}
+            >
+              <span>Return to Module</span>
+            </Button3D>
+          )}
 
           <Button3D
             variant="primary"
@@ -323,7 +386,9 @@ export const ExamModuleReviewScreen: React.FC<ExamModuleReviewScreenProps> = ({
             ) : (
               <>
                 <span>
-                  {isFinalModule
+                  {transitionError
+                    ? 'Retry Submit & Continue'
+                    : isFinalModule
                     ? 'Finish & View Score'
                     : 'Submit Module & Continue'}
                 </span>
@@ -370,9 +435,13 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
   const indexById = new Map<string, number>();
   questionIds.forEach((id, idx) => indexById.set(id, idx));
 
-  const answeredCount = questionIds.filter((qId) =>
-    Boolean(questionStates[qId]?.draftAnswer.trim() || questionStates[qId]?.submittedAnswer)
-  ).length;
+  const answeredCount = questionIds.filter((qId) => {
+    const val =
+      questionStates[qId]?.draftAnswer.trim() ||
+      questionStates[qId]?.submittedAnswer ||
+      '';
+    return Boolean(val) && (isReviewMode || !isIncompleteSprDraft(val));
+  }).length;
   const flaggedCount = questionIds.filter((qId) => flaggedSet.has(qId)).length;
 
   return (
@@ -382,6 +451,7 @@ export const ExamQuestionGridPopover: React.FC<ExamQuestionGridPopoverProps> = (
     >
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Question navigator"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[376px] overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
@@ -538,6 +608,19 @@ export const ExamExitModal: React.FC<ExamExitModalProps> = ({
   onSaveAndExit,
   onDiscard,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        soundEngine.play('toggleClose');
+        onContinue();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onContinue]);
+
   if (!isOpen) return null;
 
   return (
@@ -547,6 +630,7 @@ export const ExamExitModal: React.FC<ExamExitModalProps> = ({
     >
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Leave full practice"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md overflow-hidden rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-content-in"
