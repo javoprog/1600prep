@@ -16,6 +16,7 @@ export const TopNav: React.FC = () => {
     activeSession,
     isSessionSummaryView,
     closeActiveSession,
+    triggerWizardReset,
   } = useApp();
 
   // Hide the workspace navigation bar during an active exam session so the exam screen has its own dedicated environment
@@ -34,8 +35,12 @@ export const TopNav: React.FC = () => {
             if (activeSession) {
               closeActiveSession();
             }
+            triggerWizardReset();
+            if (typeof window !== 'undefined') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
           }}
-          className="group flex items-center focus:outline-none"
+          className="group flex items-center rounded-lg focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
         >
           <BrandLogo />
         </Link>

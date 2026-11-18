@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -36,7 +36,7 @@ const DIFFICULTY_OPTIONS: Array<{
     id: 'M',
     label: 'Medium',
     description: 'Standard Digital SAT exam complexity',
-    dotColor: 'bg-white',
+    dotColor: 'bg-[#F5F5F5]',
   },
   {
     id: 'H',
@@ -65,17 +65,33 @@ export function formatDifficultySelectionLabel(
 }
 
 export const PracticeWizard: React.FC = () => {
-  const { metas, taxonomy, startPracticeSession } = useApp();
+  const { metas, taxonomy, startPracticeSession, wizardResetToken } = useApp();
 
   const [step, setStep] = useState<WizardStep>(1);
   const [stepDirection, setStepDirection] = useState<'none' | 'forward' | 'backward'>('none');
   const [subject, setSubject] = useState<SubjectCode>('rw');
+  const stepRef = useRef<WizardStep>(step);
+  stepRef.current = step;
+  const lastResetTokenRef = useRef<number>(wizardResetToken);
 
   const navigateToStep = (target: WizardStep) => {
     if (target === step) return;
     setStepDirection(target > step ? 'forward' : 'backward');
     setStep(target);
   };
+
+  useEffect(() => {
+    if (wizardResetToken === lastResetTokenRef.current) return;
+    lastResetTokenRef.current = wizardResetToken;
+    setStartError(null);
+    if (stepRef.current !== 1) {
+      setStepDirection('backward');
+      setStep(1);
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [wizardResetToken]);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 

@@ -50,6 +50,10 @@ interface AppContextValue {
   settings: UserSettings;
   updateSettings: (partial: Partial<UserSettings>) => void;
 
+  // Wizard Navigation Reset
+  wizardResetToken: number;
+  triggerWizardReset: () => void;
+
   // Active Session & Stopwatch
   activeSession: Session | null;
   isSessionSummaryView: boolean;
@@ -108,6 +112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [isSessionSummaryView, setIsSessionSummaryView] =
     useState<boolean>(false);
+  const [wizardResetToken, setWizardResetToken] = useState<number>(0);
   const activeSessionRef = useRef<Session | null>(null);
   const handledSharedQuestionRef = useRef<string | null>(null);
 
@@ -490,6 +495,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
+  const triggerWizardReset = useCallback(() => {
+    setWizardResetToken((prev) => prev + 1);
+  }, []);
+
   const value = useMemo<AppContextValue>(
     () => ({
       taxonomy,
@@ -502,6 +511,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      wizardResetToken,
+      triggerWizardReset,
       activeSession,
       isSessionSummaryView,
       setIsSessionSummaryView,
@@ -528,6 +539,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      wizardResetToken,
+      triggerWizardReset,
       activeSession,
       isSessionSummaryView,
       startPracticeSession,

@@ -101,17 +101,13 @@ body {
 }
 
 .btn-premium:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-premium-primary:disabled {
   opacity: 1;
   background-color: #18181B;
   color: #71717A;
   border-color: #29292E;
   box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-premium-primary {

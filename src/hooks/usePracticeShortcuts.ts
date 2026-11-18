@@ -11,6 +11,7 @@ export interface UsePracticeShortcutsParams {
   canGoPrev: boolean;
   canGoNext: boolean;
   canUseScratchpad?: boolean;
+  isScratchpadOpen?: boolean;
   onSelectOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onToggleEliminateOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onSubmitAnswer: () => void;
@@ -28,6 +29,7 @@ export function usePracticeShortcuts({
   canGoPrev,
   canGoNext,
   canUseScratchpad = true,
+  isScratchpadOpen = false,
   onSelectOption,
   onToggleEliminateOption,
   onSubmitAnswer,
@@ -109,7 +111,8 @@ export function usePracticeShortcuts({
       }
 
       // MCQ choices: A-D or 1-4 to select, Shift + A-D or Shift + 1-4 to toggle strikethrough
-      if (isMcq && !isSubmitted) {
+      // Disabled while scratchpad overlay is open so keys like C (clear) or B (board) never toggle answers
+      if (isMcq && !isSubmitted && !isScratchpadOpen) {
         const codeMap: Record<string, 'A' | 'B' | 'C' | 'D'> = {
           KeyA: 'A',
           KeyB: 'B',
@@ -156,6 +159,7 @@ export function usePracticeShortcuts({
     canGoPrev,
     canGoNext,
     canUseScratchpad,
+    isScratchpadOpen,
     onSelectOption,
     onToggleEliminateOption,
     onSubmitAnswer,

@@ -60,6 +60,20 @@ function clampWindowPosition(
   };
 }
 
+function useIsMobileViewport(breakpoint = 640): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sync = () => setIsMobile(window.innerWidth < breakpoint);
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 function useDraggableWindow(initialPosition: WindowPosition, approxWidth = 600) {
   const [pos, setPos] = useState<WindowPosition>(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
@@ -236,7 +250,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 }) => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isDesmosDark, setIsDesmosDark] = useState(true);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const isMobileViewport = useIsMobileViewport();
   const [bounds, setBounds] = useState<WindowBounds>({
     x: 24,
     y: 76,
@@ -264,7 +278,6 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
     const syncViewportAndBounds = () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      setIsMobileViewport(vw < 640);
       setBounds((prev) => {
         const maxW = Math.max(minFloatWidth, vw - 24);
         const maxH = Math.max(minFloatHeight, vh - 96);
@@ -488,13 +501,8 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 
   const isDocked = !isMobileViewport && layout !== 'floating';
 
-  const panelStyle: React.CSSProperties = isMobileViewport
-    ? {
-        left: '8px',
-        right: '8px',
-        top: '68px',
-        bottom: `${footerHeight + 8}px`,
-      }
+  const panelStyle: React.CSSProperties | undefined = isMobileViewport
+    ? undefined
     : isDocked
     ? {
         top: '64px',
@@ -532,7 +540,9 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
       <div
         style={panelStyle}
         className={`fixed flex flex-col bg-[#111113] select-none ${
-          isDocked
+          isMobileViewport
+            ? 'inset-0 z-50 rounded-none border-0 shadow-none'
+            : isDocked
             ? `z-30 rounded-none ${
                 layout === 'left'
                   ? 'border-r border-[#29292E]'
@@ -579,9 +589,9 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
               onChangeLayout('floating');
             }
           }}
-          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-3.5 py-2 ${
+          className={`flex items-center justify-between gap-2 border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 ${
             isMobileViewport ? '' : 'cursor-move'
-          } ${isDocked ? '' : 'rounded-t-2xl'}`}
+          } ${isMobileViewport || isDocked ? '' : 'rounded-t-2xl'}`}
         >
           <div className="flex items-center gap-2 min-w-0">
             {!isMobileViewport && (
@@ -638,7 +648,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
         <div
           className={`relative flex-1 overflow-hidden ${
             isDesmosDark ? 'bg-[#141414]' : 'bg-white'
-          } ${isDocked ? '' : 'rounded-b-2xl'}`}
+          } ${isMobileViewport || isDocked ? '' : 'rounded-b-2xl'}`}
         >
           {/* Shield over iframe while dragging or resizing so pointer events never get swallowed */}
           {isInteracting && <div className="absolute inset-0 z-20 cursor-move" />}
@@ -670,6 +680,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
   isOpen,
   onClose,
 }) => {
+  const isMobileViewport = useIsMobileViewport();
   const { pos, isDragging, startDrag } = useDraggableWindow(
     {
       x:
@@ -685,21 +696,33 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
   return (
     <div
-      style={{
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-      }}
-      className="fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      style={
+        isMobileViewport
+          ? undefined
+          : {
+              left: `${pos.x}px`,
+              top: `${pos.y}px`,
+            }
+      }
+      className={
+        isMobileViewport
+          ? 'fixed inset-0 z-50 flex flex-col bg-[#111113] rounded-none border-0 shadow-none select-none'
+          : 'fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none'
+      }
       role="dialog"
       aria-label="Reference Sheet"
     >
       {/* Draggable Bluebook-Style Window Header */}
       <div
-        onPointerDown={startDrag}
-        className="flex items-center justify-between rounded-t-2xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
+        onPointerDown={isMobileViewport ? undefined : startDrag}
+        className={`flex items-center justify-between border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 ${
+          isMobileViewport ? '' : 'rounded-t-2xl cursor-move'
+        }`}
       >
         <div className="flex items-center gap-2">
-          <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          {!isMobileViewport && (
+            <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          )}
           <span className="text-xs font-semibold text-[#F5F5F5]">
             Reference Sheet
           </span>
@@ -721,9 +744,9 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
 
       {/* Official Bluebook SAT Reference Sheet Content (Best-Fit Form) */}
       <div
-        className={`overflow-y-auto rounded-b-2xl bg-[#111113] p-5 sm:p-6 text-[#F5F5F5] ${
-          isDragging ? 'pointer-events-none' : ''
-        }`}
+        className={`flex-1 overflow-y-auto bg-[#111113] p-5 sm:p-6 text-[#F5F5F5] ${
+          isMobileViewport ? '' : 'rounded-b-2xl'
+        } ${isDragging ? 'pointer-events-none' : ''}`}
       >
         {/* Row 1: Circle, Rectangle, Triangle, Pythagorean Theorem, Special Right Triangles */}
         <div className="grid grid-cols-2 sm:grid-cols-12 gap-y-6 gap-x-3 items-end border-b border-[#29292E] pb-5">
@@ -997,7 +1020,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
           </li>
           <li>
             If your answer is a <strong className="text-[#F5F5F5]">mixed number</strong> (such as{' '}
-            <KatexFormula tex="3\frac{1}{2}" className="text-[#F5F5F5]" />), enter it as an improper fraction (<code className="font-mono text-white">7/2</code>) or its decimal equivalent (<code className="font-mono text-white">3.5</code>).
+            <KatexFormula tex="3\frac{1}{2}" className="text-[#F5F5F5]" />), enter it as an improper fraction (<code className="font-mono text-[#F5F5F5]">7/2</code>) or its decimal equivalent (<code className="font-mono text-[#F5F5F5]">3.5</code>).
           </li>
           <li>
             Don&apos;t enter <strong className="text-[#F5F5F5]">symbols</strong> such as a percent sign (<code className="font-mono text-[#A1A1AA]">%</code>), comma (<code className="font-mono text-[#A1A1AA]">,</code>), or dollar sign (<code className="font-mono text-[#A1A1AA]">$</code>).

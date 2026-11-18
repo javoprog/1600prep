@@ -10,8 +10,8 @@ export interface PassageHighlight {
 }
 
 export interface ScratchpadPoint {
-  x: number; // Normalized 0..1 relative to canvas CSS width
-  y: number; // Normalized 0..1 relative to canvas CSS height
+  x: number;
+  y: number;
 }
 
 export interface ScratchpadStroke {
@@ -19,6 +19,8 @@ export interface ScratchpadStroke {
   points: ScratchpadPoint[];
   width: number;
   color?: string;
+  target?: 'overlay' | 'board';
+  coordSpace?: 'norm' | 'center-px' | 'px';
 }
 
 export type DifficultyCode = 'E' | 'M' | 'H';

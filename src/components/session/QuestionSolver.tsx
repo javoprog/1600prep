@@ -72,6 +72,8 @@ export const QuestionSolver: React.FC = () => {
   const [isLoadingQuestion, setIsLoadingQuestion] = useState<boolean>(true);
   const [questionError, setQuestionError] = useState<string | null>(null);
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(false);
+  const [isScratchBoardOpen, setIsScratchBoardOpen] = useState<boolean>(false);
+  const [scratchBoardWidth, setScratchBoardWidth] = useState<number>(460);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [calculatorLayout, setCalculatorLayout] =
     useState<CalculatorLayout>('floating');
@@ -96,12 +98,19 @@ export const QuestionSolver: React.FC = () => {
       setIsDesktopSmUp(isSmUp);
       if (!isSmUp) {
         setIsScratchpadOpen(false);
+        setIsScratchBoardOpen(false);
       }
       setCalculatorDockWidth((prev) => {
         const preferred = Math.min(580, Math.max(360, Math.round(vw * 0.45)));
         const maxAllowed = Math.max(360, Math.round(vw * 0.58));
         if (prev === 520 && vw < 1200) return preferred;
         return Math.min(Math.max(340, prev), maxAllowed);
+      });
+      setScratchBoardWidth((prev) => {
+        const preferred = Math.min(480, Math.max(320, Math.round(vw * 0.38)));
+        const maxAllowed = Math.max(320, Math.floor(vw * 0.55));
+        if (prev === 460 && vw < 1100) return preferred;
+        return Math.min(Math.max(320, prev), maxAllowed);
       });
     };
     syncViewport();
@@ -321,6 +330,26 @@ export const QuestionSolver: React.FC = () => {
     });
   }, []);
 
+  const handleToggleScratchBoard = useCallback(
+    (nextOpen: boolean) => {
+      setIsScratchBoardOpen(nextOpen);
+      if (nextOpen && isCalculatorOpen && calculatorLayout === 'right') {
+        setCalculatorLayout('floating');
+      }
+    },
+    [isCalculatorOpen, calculatorLayout]
+  );
+
+  const handleCalculatorLayoutChange = useCallback(
+    (nextLayout: CalculatorLayout) => {
+      setCalculatorLayout(nextLayout);
+      if (nextLayout === 'right') {
+        setIsScratchBoardOpen(false);
+      }
+    },
+    []
+  );
+
   const handleUpdateHighlights = useCallback(
     (qId: string, nextHighlights: PassageHighlight[]) => {
       setQuestionHighlights(qId, nextHighlights);
@@ -371,6 +400,7 @@ export const QuestionSolver: React.FC = () => {
     canGoPrev: currentIdx > 0,
     canGoNext: currentIdx < totalQuestions - 1,
     canUseScratchpad: isDesktopSmUp,
+    isScratchpadOpen: isScratchpadOpen && isDesktopSmUp,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
@@ -457,6 +487,15 @@ export const QuestionSolver: React.FC = () => {
     isCalculatorOpen &&
     calculatorLayout !== 'floating' &&
     isDesktopSmUp;
+  const isScratchBoardDocked =
+    isScratchpadOpen && isDesktopSmUp && isScratchBoardOpen;
+  const leftDockWidth =
+    isCalculatorDocked && calculatorLayout === 'left' ? calculatorDockWidth : 0;
+  const rightDockWidth = isScratchBoardDocked
+    ? scratchBoardWidth
+    : isCalculatorDocked && calculatorLayout === 'right'
+    ? calculatorDockWidth
+    : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0A0A0B] text-[#F5F5F5] animate-page-fade">
@@ -471,7 +510,7 @@ export const QuestionSolver: React.FC = () => {
                 soundEngine.play('click');
                 closeActiveSession();
               }}
-              className="group flex items-center cursor-pointer focus:outline-none"
+              className="group flex items-center rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
               title="Return to main menu"
             >
               <BrandLogo />
@@ -499,7 +538,7 @@ export const QuestionSolver: React.FC = () => {
                 soundEngine.play('click');
                 setIsTimerHidden((prev) => !prev);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isTimerHidden ? 'Show timer' : 'Hide timer'}
               aria-label={isTimerHidden ? 'Show timer' : 'Hide timer'}
             >
@@ -528,7 +567,7 @@ export const QuestionSolver: React.FC = () => {
                     className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                       isCalculatorOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                        : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
                     }`}
                     title="Graphing Calculator"
                     aria-label="Graphing Calculator"
@@ -550,7 +589,7 @@ export const QuestionSolver: React.FC = () => {
                     className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                       isReferenceOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                        : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
                     }`}
                     title="Math Reference Sheet"
                     aria-label="Math Reference Sheet"
@@ -569,7 +608,7 @@ export const QuestionSolver: React.FC = () => {
                 className={`hidden sm:inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors cursor-pointer ${
                   isScratchpadOpen
                     ? 'bg-[#18181B] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                    : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
                 }`}
                 title="Toggle Scratchpad"
                 aria-label="Toggle Scratchpad"
@@ -584,7 +623,7 @@ export const QuestionSolver: React.FC = () => {
             <button
               type="button"
               onClick={handleShareQuestion}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isShareCopied ? 'Link copied!' : 'Copy link to this question'}
               aria-label="Copy link to this question"
             >
@@ -606,7 +645,7 @@ export const QuestionSolver: React.FC = () => {
             layout={calculatorLayout}
             dockWidth={calculatorDockWidth}
             footerHeight={footerHeight}
-            onChangeLayout={setCalculatorLayout}
+            onChangeLayout={handleCalculatorLayoutChange}
             onChangeDockWidth={setCalculatorDockWidth}
             onResizingDockChange={setIsResizingDock}
             onClose={() => {
@@ -634,14 +673,8 @@ export const QuestionSolver: React.FC = () => {
       {/* Full-Screen Examination Area (between Header and Footer) */}
       <div
         style={{
-          paddingLeft:
-            isCalculatorDocked && calculatorLayout === 'left'
-              ? `${calculatorDockWidth}px`
-              : undefined,
-          paddingRight:
-            isCalculatorDocked && calculatorLayout === 'right'
-              ? `${calculatorDockWidth}px`
-              : undefined,
+          paddingLeft: leftDockWidth > 0 ? `${leftDockWidth}px` : undefined,
+          paddingRight: rightDockWidth > 0 ? `${rightDockWidth}px` : undefined,
         }}
         className={`relative flex w-full flex-1 flex-col ${
           isResizingDock
@@ -649,21 +682,30 @@ export const QuestionSolver: React.FC = () => {
             : 'transition-[padding] duration-200 ease-out'
         }`}
       >
-        {/* Transparent Full-Screen HTML5 Canvas Scratchpad Overlay */}
-        <ScratchpadOverlay
-          isOpen={isScratchpadOpen && isDesktopSmUp}
-          questionId={currentQuestionId}
-          strokes={scratchpadMap[currentQuestionId] || []}
-          onChangeStrokes={handleUpdateScratchpadStrokes}
-          onClose={() => setIsScratchpadOpen(false)}
-        />
+        <div className="relative flex w-full flex-1 flex-col">
+          {/* Transparent Canvas Overlay + Dockable Expanded Scratch Board */}
+          <ScratchpadOverlay
+            isOpen={isScratchpadOpen && isDesktopSmUp}
+            questionId={currentQuestionId}
+            strokes={scratchpadMap[currentQuestionId] || []}
+            isBoardOpen={isScratchBoardOpen}
+            boardWidth={scratchBoardWidth}
+            footerHeight={footerHeight}
+            onToggleBoard={handleToggleScratchBoard}
+            onChangeBoardWidth={setScratchBoardWidth}
+            onResizingBoardChange={setIsResizingDock}
+            onChangeStrokes={handleUpdateScratchpadStrokes}
+            onClose={() => setIsScratchpadOpen(false)}
+          />
 
-        {/* Dedicated Examination Content Container */}
-        <div
-          className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
-            isScratchpadOpen && isDesktopSmUp ? 'pointer-events-none select-none' : ''
-          }`}
-        >
+          {/* Dedicated Examination Content Container (extra bottom scratch room when active) */}
+          <div
+            className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
+              isScratchpadOpen && isDesktopSmUp
+                ? 'pb-56 lg:pb-64 pointer-events-none select-none'
+                : ''
+            }`}
+          >
         {isLoadingQuestion ? (
           <div className="flex flex-1 flex-col items-center justify-center py-24">
             <Loader2 className="h-6 w-6 animate-spin text-[#69ff00]" />
@@ -920,8 +962,8 @@ export const QuestionSolver: React.FC = () => {
                               }
                               className={`relative z-20 flex h-7 w-7 items-center justify-center rounded-full transition-all cursor-pointer ${
                                 isEliminated
-                                  ? 'text-white opacity-100 hover:bg-[#1F1F23] hover:text-white'
-                                  : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#1F1F23] hover:text-[#F5F5F5]'
+                                  ? 'text-[#F5F5F5] opacity-100 hover:bg-[#18181B] hover:text-[#F5F5F5]'
+                                  : 'text-[#71717A] opacity-50 group-hover:opacity-100 hover:bg-[#18181B] hover:text-[#F5F5F5]'
                               }`}
                             >
                               {isEliminated ? (
@@ -994,7 +1036,7 @@ export const QuestionSolver: React.FC = () => {
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleSprHelperKey(k.char)}
-                          className="flex h-8 min-w-[2.5rem] items-center justify-center rounded-full border border-[#29292E] bg-[#18181B] px-3 font-mono text-sm font-medium text-[#F5F5F5] active:scale-95 transition-transform"
+                          className="flex h-8 min-w-[2.5rem] items-center justify-center rounded-full border border-[#29292E] bg-[#18181B] px-3 font-mono text-sm font-medium text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#202024] active:scale-95 transition-all cursor-pointer"
                           aria-label={`Insert ${k.char === '-' ? 'negative sign' : k.char === '/' ? 'fraction slash' : 'decimal point'}`}
                         >
                           {k.label}
@@ -1152,6 +1194,7 @@ export const QuestionSolver: React.FC = () => {
             </div>
           </div>
         )}
+          </div>
         </div>
       </div>
 

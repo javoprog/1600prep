@@ -93,7 +93,7 @@ export const SessionSummary: React.FC = () => {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 animate-completion">
       {/* Editorial Header */}
       <div className="border-b border-[#1F1F23] pb-8">
-        <p className="text-xs font-medium text-white">
+        <p className="text-xs font-medium text-[#A1A1AA]">
           Session completed •{' '}
           {activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'}
         </p>
@@ -195,7 +195,7 @@ export const SessionSummary: React.FC = () => {
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2.5">
-                      <span className="text-sm font-medium text-[#F5F5F5] group-hover:text-white truncate">
+                      <span className="text-sm font-medium text-[#F5F5F5] group-hover:text-[#F5F5F5] truncate">
                         {meta?.skillLabel || `Question ${qId}`}
                       </span>
                       {meta?.difficulty && (
