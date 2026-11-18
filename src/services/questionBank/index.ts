@@ -18,7 +18,6 @@ import {
 import {
   buildTaxonomyFromLookupAndMetas,
   evaluateAnswer,
-  isIncompleteSprDraft,
   isValidCompleteSprFormat,
   normalizeDigitalQuestion,
   normalizeDisclosedQuestion,
@@ -29,7 +28,7 @@ import {
   RawQuestionListItem,
 } from './normalizer';
 
-export { evaluateAnswer, isIncompleteSprDraft, isValidCompleteSprFormat };
+export { evaluateAnswer, isValidCompleteSprFormat };
 
 const QBANK_BASE = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod';
 const SAIC_BASE = 'https://saic.collegeboard.org/disclosed';

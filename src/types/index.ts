@@ -38,73 +38,7 @@ export type NewPreviousRatio = 100 | 75 | 50 | 25 | 0;
 export type PracticeMode =
   | 'custom'
   | 'mistakes'
-  | 'retry'
-  | 'exam';
-
-export type HomePracticeTab = 'topic' | 'full';
-export type ExamTrack = 'full' | 'rw' | 'math';
-export type ExamPhase = 'testing' | 'module-review' | 'break' | 'completed';
-export type AdaptiveTier = 'baseline' | 'easy' | 'hard';
-
-export interface ExamModuleState {
-  id: string;
-  subject: SubjectCode;
-  moduleNumber: 1 | 2;
-  label: string;
-  shortLabel: string;
-  tier: AdaptiveTier;
-  timeLimitMs: number;
-  timeRemainingMs: number;
-  questionIds: string[];
-  locked: boolean;
-  submittedAt?: number;
-  rawCorrectCount?: number;
-  totalCount?: number;
-}
-
-export interface DomainScoreBreakdown {
-  domain: string;
-  domainLabel: string;
-  subject: SubjectCode;
-  correct: number;
-  total: number;
-}
-
-export interface SectionScorePrediction {
-  subject: SubjectCode;
-  subjectLabel: string;
-  predictedScore: number;
-  rangeLow: number;
-  rangeHigh: number;
-  module1Correct: number;
-  module1Total: number;
-  module2Correct: number;
-  module2Total: number;
-  module2Tier: 'easy' | 'hard';
-  totalCorrect: number;
-  totalQuestions: number;
-}
-
-export interface ExamScoreReport {
-  track: ExamTrack;
-  totalScore?: number;
-  totalRangeLow?: number;
-  totalRangeHigh?: number;
-  sections: Partial<Record<SubjectCode, SectionScorePrediction>>;
-  domainBreakdown: DomainScoreBreakdown[];
-  computedAt: number;
-}
-
-export interface ExamSessionState {
-  track: ExamTrack;
-  phase: ExamPhase;
-  currentModuleIndex: number;
-  modules: ExamModuleState[];
-  flaggedQuestionIds: string[];
-  breakTimeRemainingMs: number;
-  isExamPaused: boolean;
-  scoreReport?: ExamScoreReport;
-}
+  | 'retry';
 
 export interface SkillTaxonomyItem {
   id: string;
@@ -217,7 +151,6 @@ export interface Session {
   completedAt?: number;
   totalTime: number; // milliseconds accumulated across the session
   isPaused: boolean;
-  exam?: ExamSessionState;
 }
 
 export interface Bookmark {

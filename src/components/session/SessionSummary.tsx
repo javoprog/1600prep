@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Button3D } from '@/components/ui/Button3D';
@@ -20,16 +20,6 @@ export const SessionSummary: React.FC = () => {
     metaMap,
   } = useApp();
 
-  const [moduleFilterId, setModuleFilterId] = useState<string>('all');
-
-  const isExamSummary =
-    activeSession?.mode === 'exam' && Boolean(activeSession?.exam?.scoreReport);
-  const examReport = activeSession?.exam?.scoreReport;
-  const examModules = useMemo(
-    () => activeSession?.exam?.modules || [],
-    [activeSession?.exam?.modules]
-  );
-
   if (!activeSession) return null;
 
   const totalQuestions = activeSession.questionIds.length;
@@ -39,27 +29,16 @@ export const SessionSummary: React.FC = () => {
 
   const correctCount = states.filter((s) => s?.isSubmitted && s.isCorrect).length;
   const incorrectCount = states.filter(
-    (s) =>
-      s?.isSubmitted &&
-      !s.isCorrect &&
-      (!isExamSummary || Boolean(s.submittedAnswer?.trim()))
+    (s) => s?.isSubmitted && !s.isCorrect
   ).length;
-  const answeredCount = isExamSummary
-    ? states.filter((s) => Boolean(s?.submittedAnswer?.trim())).length
-    : correctCount + incorrectCount;
+  const answeredCount = correctCount + incorrectCount;
 
   const accuracy =
-    isExamSummary && totalQuestions > 0
-      ? Math.round((correctCount / totalQuestions) * 100)
-      : answeredCount > 0
-      ? Math.round((correctCount / answeredCount) * 100)
-      : 0;
+    answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
 
   const totalTimeMs = activeSession.totalTime;
   const avgTimeMs =
-    (isExamSummary ? totalQuestions : answeredCount) > 0
-      ? Math.round(totalTimeMs / (isExamSummary ? totalQuestions : answeredCount))
-      : 0;
+    answeredCount > 0 ? Math.round(totalTimeMs / answeredCount) : 0;
 
   const mistakeQuestionIds = activeSession.questionIds.filter((id) => {
     const st = activeSession.questionStates[id];
@@ -71,29 +50,19 @@ export const SessionSummary: React.FC = () => {
     activeSession.maxVisitedIndex ?? 0
   );
 
-  const moduleByQuestionId = new Map<string, string>();
-  examModules.forEach((m) => {
-    m.questionIds.forEach((qId) => moduleByQuestionId.set(qId, m.id));
-  });
-
   const displayedQuestionEntries = activeSession.questionIds
     .map((qId, idx) => ({
       qId,
       idx,
       st: activeSession.questionStates[qId],
-      modId: moduleByQuestionId.get(qId),
     }))
-    .filter(({ idx, st, modId }) => {
-      if (isExamSummary) {
-        return moduleFilterId === 'all' || modId === moduleFilterId;
-      }
-      return (
+    .filter(
+      ({ idx, st }) =>
         idx <= maxVisitedIdx ||
         Boolean(st?.visited) ||
         Boolean(st?.isSubmitted) ||
         Boolean(st?.draftAnswer)
-      );
-    });
+    );
 
   const handleReviewAll = () => {
     goToQuestionIndex(0);
@@ -120,43 +89,13 @@ export const SessionSummary: React.FC = () => {
       ? "Nice work — you're making steady progress."
       : 'Every question reviewed builds stronger intuition for the next set.';
 
-  const singleSectionPrediction =
-    examReport?.sections.rw || examReport?.sections.math;
-
-  const heroScore =
-    examReport?.track === 'full'
-      ? examReport.totalScore
-      : singleSectionPrediction?.predictedScore;
-  const heroRangeLow =
-    examReport?.track === 'full'
-      ? examReport.totalRangeLow
-      : singleSectionPrediction?.rangeLow;
-  const heroRangeHigh =
-    examReport?.track === 'full'
-      ? examReport.totalRangeHigh
-      : singleSectionPrediction?.rangeHigh;
-
-  const sectionPredictions = [
-    examReport?.sections.rw,
-    examReport?.sections.math,
-  ].filter((s): s is NonNullable<typeof s> => Boolean(s));
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 animate-completion">
       {/* Editorial Header */}
       <div className="border-b border-[#1F1F23] pb-8">
         <p className="text-xs font-medium text-white">
-          {isExamSummary
-            ? `Score Report • ${
-                examReport?.track === 'full'
-                  ? 'Full Digital SAT Practice'
-                  : examReport?.track === 'rw'
-                  ? 'Only Reading & Writing Full Practice'
-                  : 'Only Math Full Practice'
-              }`
-            : `Session completed • ${
-                activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'
-              }`}
+          Session completed •{' '}
+          {activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'}
         </p>
         <div className="mt-2 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
           <div>
@@ -166,88 +105,13 @@ export const SessionSummary: React.FC = () => {
             <p className="mt-2 text-sm text-[#A1A1AA]">{encouragingLine}</p>
           </div>
 
-          {isExamSummary && heroScore !== undefined ? (
-            <div className="sm:text-right">
-              <div className="font-editorial text-4xl sm:text-5xl tabular-nums text-[#69ff00] leading-none">
-                {heroScore}
-                <span className="ml-1.5 text-base font-sans font-normal text-[#71717A]">
-                  / {examReport?.track === 'full' ? '1600' : '800'}
-                </span>
-              </div>
-              <div className="text-xs text-[#A1A1AA] mt-1.5 tabular-nums">
-                Estimated range {heroRangeLow}–{heroRangeHigh}
-              </div>
+          <div className="sm:text-right">
+            <div className="font-editorial text-3xl sm:text-4xl tabular-nums text-[#69ff00]">
+              {accuracy}%
             </div>
-          ) : (
-            <div className="sm:text-right">
-              <div className="font-editorial text-3xl sm:text-4xl tabular-nums text-[#69ff00]">
-                {accuracy}%
-              </div>
-              <div className="text-xs text-[#71717A] mt-0.5">Session Accuracy</div>
-            </div>
-          )}
-        </div>
-
-        {/* Section Score Cards + Adaptive Module 2 Reveal (Full Exam only) */}
-        {isExamSummary && sectionPredictions.length > 0 && (
-          <div
-            className={`mt-8 grid gap-4 ${
-              sectionPredictions.length === 2
-                ? 'grid-cols-1 sm:grid-cols-2'
-                : 'grid-cols-1'
-            }`}
-          >
-            {sectionPredictions.map((sec) => (
-              <div
-                key={sec.subject}
-                className="rounded-2xl border border-[#29292E] bg-[#111113] p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs text-[#A1A1AA]">
-                      {sec.subjectLabel}
-                    </div>
-                    <div className="mt-1 flex items-baseline gap-2">
-                      <span className="font-editorial text-3xl tabular-nums text-[#F5F5F5]">
-                        {sec.predictedScore}
-                      </span>
-                      <span className="text-xs tabular-nums text-[#71717A]">
-                        ({sec.rangeLow}–{sec.rangeHigh})
-                      </span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                      sec.module2Tier === 'hard'
-                        ? 'border-[#69ff00]/35 bg-[#69ff00]/10 text-[#69ff00]'
-                        : 'border-[#29292E] bg-[#18181B] text-[#A1A1AA]'
-                    }`}
-                  >
-                    {sec.module2Tier === 'hard'
-                      ? 'Harder Module 2'
-                      : 'Easier Module 2'}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#1F1F23] pt-3 text-xs">
-                  <div>
-                    <span className="text-[#71717A]">Module 1</span>
-                    <div className="mt-0.5 font-mono font-medium text-[#F5F5F5] tabular-nums">
-                      {sec.module1Correct}/{sec.module1Total} correct
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[#71717A]">Module 2</span>
-                    <div className="mt-0.5 font-mono font-medium text-[#F5F5F5] tabular-nums">
-                      {sec.module2Correct}/{sec.module2Total} correct
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div className="text-xs text-[#71717A] mt-0.5">Session Accuracy</div>
           </div>
-        )}
+        </div>
 
         {/* Clean Typography-Driven Metrics Strip */}
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-[#1F1F23] pt-6">
@@ -255,11 +119,6 @@ export const SessionSummary: React.FC = () => {
             <div className="text-xs text-[#71717A]">Answered</div>
             <div className="mt-1 text-lg font-medium tabular-nums text-[#F5F5F5]">
               {answeredCount}
-              {isExamSummary && (
-                <span className="text-xs font-normal text-[#71717A]">
-                  /{totalQuestions}
-                </span>
-              )}
             </div>
           </div>
 
@@ -307,85 +166,11 @@ export const SessionSummary: React.FC = () => {
         </div>
       </div>
 
-      {/* Domain Breakdown Grid (Full Exam only) */}
-      {isExamSummary && examReport && examReport.domainBreakdown.length > 0 && (
-        <div className="mt-10 border-b border-[#1F1F23] pb-10">
-          <h2 className="text-xs font-medium text-[#71717A] mb-4">
-            Domain Performance
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {examReport.domainBreakdown.map((dom) => {
-              const pct =
-                dom.total > 0 ? Math.round((dom.correct / dom.total) * 100) : 0;
-              return (
-                <div
-                  key={`${dom.subject}-${dom.domain}`}
-                  className="rounded-2xl border border-[#29292E] bg-[#111113] p-4"
-                >
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-medium text-[#F5F5F5] truncate">
-                      {dom.domainLabel}
-                    </span>
-                    <span className="shrink-0 font-mono text-[#A1A1AA] tabular-nums">
-                      {dom.correct}/{dom.total} ({pct}%)
-                    </span>
-                  </div>
-                  <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-[#1F1F23]">
-                    <div
-                      className="h-full rounded-full bg-[#69ff00] transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Simple Divided Question List */}
       <div className="mt-10">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xs font-medium text-[#71717A]">
-            Question Breakdown — Click any item to inspect
-          </h2>
-
-          {isExamSummary && examModules.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.play('click');
-                  setModuleFilterId('all');
-                }}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                  moduleFilterId === 'all'
-                    ? 'border-transparent bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                    : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
-                }`}
-              >
-                All ({totalQuestions})
-              </button>
-              {examModules.map((mod) => (
-                <button
-                  key={mod.id}
-                  type="button"
-                  onClick={() => {
-                    soundEngine.play('click');
-                    setModuleFilterId(mod.id);
-                  }}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                    moduleFilterId === mod.id
-                      ? 'border-transparent bg-[#69ff00] text-[#0A0A0B] font-semibold'
-                      : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:text-[#F5F5F5]'
-                  }`}
-                >
-                  {mod.shortLabel}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <h2 className="text-xs font-medium text-[#71717A] mb-3">
+          Question Breakdown — Click any item to inspect
+        </h2>
 
         <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113]">
           {displayedQuestionEntries.map(({ qId, idx, st }) => {
@@ -429,7 +214,7 @@ export const SessionSummary: React.FC = () => {
 
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-right text-xs">
-                    {st?.isSubmitted && st.submittedAnswer ? (
+                    {st?.isSubmitted ? (
                       <span
                         className={
                           st.isCorrect ? 'text-emerald-400' : 'text-red-400'
@@ -437,8 +222,6 @@ export const SessionSummary: React.FC = () => {
                       >
                         {st.isCorrect ? 'Correct' : 'Incorrect'} ({st.submittedAnswer})
                       </span>
-                    ) : st?.isSubmitted ? (
-                      <span className="text-red-400">Skipped</span>
                     ) : (
                       <span className="text-[#71717A]">Unanswered</span>
                     )}

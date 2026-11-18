@@ -1,7 +1,6 @@
 import {
   Question,
   QuestionMeta,
-  Session,
   TaxonomyData,
 } from '@/types';
 
@@ -123,69 +122,6 @@ export async function setKV<T>(key: string, value: T): Promise<void> {
   } catch (err) {
     console.warn('IndexedDB setKV failed:', err);
   }
-}
-
-export async function removeKV(key: string): Promise<void> {
-  try {
-    await withStore(STORES.KV, 'readwrite', (store) => store.delete(key));
-  } catch (err) {
-    console.warn('IndexedDB removeKV failed:', err);
-  }
-}
-
-// --- Active Full Exam Persistence & Seen Question Tracking ---
-
-const ACTIVE_EXAM_KEY = 'active_exam_session_v1';
-const SEEN_EXAM_IDS_KEY = 'seen_exam_question_ids_v1';
-
-export async function saveActiveExamSession(session: Session): Promise<void> {
-  if (session.mode !== 'exam') return;
-  await setKV(ACTIVE_EXAM_KEY, session);
-}
-
-export async function loadActiveExamSession(): Promise<Session | null> {
-  const saved = await getKV<Session>(ACTIVE_EXAM_KEY);
-  if (!saved || saved.mode !== 'exam' || !saved.exam || saved.completedAt) {
-    return null;
-  }
-  // Always restore paused so the student resumes intentionally
-  return {
-    ...saved,
-    isPaused: true,
-    exam: {
-      ...saved.exam,
-      isExamPaused: true,
-    },
-  };
-}
-
-export async function clearActiveExamSession(): Promise<void> {
-  await removeKV(ACTIVE_EXAM_KEY);
-}
-
-export async function getSeenExamQuestionIds(): Promise<string[]> {
-  const saved = await getKV<string[]>(SEEN_EXAM_IDS_KEY);
-  return Array.isArray(saved) ? saved : [];
-}
-
-export async function addSeenExamQuestionIds(questionIds: string[]): Promise<void> {
-  if (!questionIds.length) return;
-  const existing = await getSeenExamQuestionIds();
-  const merged = Array.from(new Set([...existing, ...questionIds]));
-  await setKV(SEEN_EXAM_IDS_KEY, merged);
-}
-
-export async function clearSeenExamQuestionIds(subset?: string[]): Promise<void> {
-  if (!subset || subset.length === 0) {
-    await removeKV(SEEN_EXAM_IDS_KEY);
-    return;
-  }
-  const removeSet = new Set(subset);
-  const existing = await getSeenExamQuestionIds();
-  await setKV(
-    SEEN_EXAM_IDS_KEY,
-    existing.filter((id) => !removeSet.has(id))
-  );
 }
 
 export async function getCachedTaxonomy(): Promise<TaxonomyData | null> {

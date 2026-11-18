@@ -11,9 +11,6 @@ import React, {
 } from 'react';
 import {
   Attempt,
-  ExamPhase,
-  ExamTrack,
-  HomePracticeTab,
   PassageHighlight,
   PracticeFilters,
   PracticeMode,
@@ -31,28 +28,11 @@ import {
   saveUserSettings,
 } from '@/services/storage/preferences';
 import {
-  addSeenExamQuestionIds,
-  clearActiveExamSession,
-  getSeenExamQuestionIds,
-  loadActiveExamSession,
-  saveActiveExamSession,
-} from '@/services/storage/db';
-import {
   evaluateAnswer,
-  fetchQuestionDetail,
   initializeCatalog,
   prefetchQuestions,
   selectQuestionsForSession,
 } from '@/services/questionBank';
-import {
-  buildExamModule,
-  buildInitialExamModules,
-  EXAM_BREAK_TIME_MS,
-} from '@/services/questionBank/examBuilder';
-import {
-  computeExamScoreReport,
-  determineModule2Tier,
-} from '@/services/scoring/satScorer';
 import { soundEngine } from '@/services/sound/soundEngine';
 
 interface AppContextValue {
@@ -70,16 +50,8 @@ interface AppContextValue {
   settings: UserSettings;
   updateSettings: (partial: Partial<UserSettings>) => void;
 
-  // Workspace Navigation
-  homeTab: HomePracticeTab;
-  setHomeTab: (tab: HomePracticeTab) => void;
-
   // Active Session & Stopwatch
   activeSession: Session | null;
-  savedResumeExam: Session | null;
-  isTransitioningExamModule: boolean;
-  examTransitionError: string | null;
-  clearExamTransitionError: () => void;
   isSessionSummaryView: boolean;
   setIsSessionSummaryView: (val: boolean) => void;
   startPracticeSession: (
@@ -88,16 +60,8 @@ interface AppContextValue {
     title: string,
     explicitQuestionIds?: string[]
   ) => Promise<Session>;
-  startFullExam: (track: ExamTrack) => Promise<Session>;
-  resumeSavedExam: () => void;
-  discardSavedExam: () => Promise<void>;
-  exitAndSaveExam: () => Promise<void>;
   closeActiveSession: () => void;
   togglePauseSession: () => void;
-  toggleFlagQuestion: (questionId: string) => void;
-  setExamPhase: (phase: ExamPhase) => void;
-  skipExamBreak: () => void;
-  lockCurrentModuleAndAdvance: () => Promise<void>;
   setDraftAnswer: (questionId: string, draft: string) => void;
   setQuestionHighlights: (
     questionId: string,
@@ -127,45 +91,6 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function fetchQuestionDetailsWithRetry(
-  questionIds: string[],
-  concurrency = 5
-): Promise<{ detailMap: Map<string, Question>; failedIds: string[] }> {
-  const detailMap = new Map<string, Question>();
-  const failedIds: string[] = [];
-  if (questionIds.length === 0) {
-    return { detailMap, failedIds };
-  }
-
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < questionIds.length) {
-      const idx = cursor++;
-      const qId = questionIds[idx];
-      let resolved: Question | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          resolved = await fetchQuestionDetail(qId);
-          break;
-        } catch {
-          if (attempt === 0) {
-            await new Promise((r) => setTimeout(r, 350));
-          }
-        }
-      }
-      if (resolved) {
-        detailMap.set(qId, resolved);
-      } else {
-        failedIds.push(qId);
-      }
-    }
-  };
-
-  const workerCount = Math.min(concurrency, questionIds.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return { detailMap, failedIds };
-}
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -180,118 +105,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
 
-  const [homeTab, setHomeTab] = useState<HomePracticeTab>('topic');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [savedResumeExam, setSavedResumeExam] = useState<Session | null>(null);
-  const [isTransitioningExamModule, setIsTransitioningExamModule] =
-    useState<boolean>(false);
-  const [examTransitionError, setExamTransitionError] = useState<string | null>(
-    null
-  );
   const [isSessionSummaryView, setIsSessionSummaryView] =
     useState<boolean>(false);
   const activeSessionRef = useRef<Session | null>(null);
   const handledSharedQuestionRef = useRef<string | null>(null);
-  const isTransitioningModuleRef = useRef<boolean>(false);
-  const lastExamSaveMsRef = useRef<number>(0);
 
   useEffect(() => {
     activeSessionRef.current = activeSession;
-  }, [activeSession]);
-
-  // Restore any interrupted Full Exam snapshot from IndexedDB on boot
-  useEffect(() => {
-    loadActiveExamSession()
-      .then((saved) => {
-        if (saved && !activeSessionRef.current) {
-          setSavedResumeExam(saved);
-          setHomeTab('full');
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Guard accidental tab close during an active unfinished Full Exam and flush snapshot
-  useEffect(() => {
-    if (
-      typeof window === 'undefined' ||
-      activeSession?.mode !== 'exam' ||
-      activeSession.completedAt
-    ) {
-      return;
-    }
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (activeSessionRef.current) {
-        saveActiveExamSession(activeSessionRef.current).catch(() => {});
-      }
-      e.preventDefault();
-      e.returnValue = '';
-    };
-
-    const handlePageHide = () => {
-      if (activeSessionRef.current?.mode === 'exam' && !activeSessionRef.current.completedAt) {
-        saveActiveExamSession(activeSessionRef.current).catch(() => {});
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
-    };
-  }, [activeSession?.id, activeSession?.mode, activeSession?.completedAt]);
-
-  const examStructuralSig = useMemo(() => {
-    if (!activeSession || activeSession.mode !== 'exam' || !activeSession.exam) {
-      return '';
-    }
-    const drafts = activeSession.questionIds
-      .map((id) => activeSession.questionStates[id]?.draftAnswer || '')
-      .join('\u0001');
-    const hlSig = Object.entries(activeSession.highlightsByQuestion || {})
-      .map(([id, list]) => `${id}:${list.map((h) => `${h.start}-${h.end}-${h.color}`).join(',')}`)
-      .join(';');
-    const elimSig = Object.entries(activeSession.eliminatedByQuestion || {})
-      .map(([id, list]) => `${id}:${list.join('')}`)
-      .join(';');
-    const scratchSig = Object.entries(activeSession.scratchpadByQuestion || {})
-      .map(([id, list]) => `${id}:${list.length}`)
-      .join(';');
-    return [
-      activeSession.id,
-      activeSession.currentIndex,
-      activeSession.exam.phase,
-      activeSession.exam.currentModuleIndex,
-      activeSession.exam.isExamPaused ? '1' : '0',
-      activeSession.exam.flaggedQuestionIds.join(','),
-      drafts,
-      hlSig,
-      elimSig,
-      scratchSig,
-    ].join('|');
-  }, [activeSession]);
-
-  // Persist immediately when exam structure/answers change; throttle pure timer ticks to 3s
-  useEffect(() => {
-    if (!activeSession || activeSession.mode !== 'exam' || activeSession.completedAt) {
-      return;
-    }
-    lastExamSaveMsRef.current = Date.now();
-    saveActiveExamSession(activeSession).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examStructuralSig]);
-
-  useEffect(() => {
-    if (!activeSession || activeSession.mode !== 'exam' || activeSession.completedAt) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastExamSaveMsRef.current >= 3000) {
-      lastExamSaveMsRef.current = now;
-      saveActiveExamSession(activeSession).catch(() => {});
-    }
   }, [activeSession]);
 
   useEffect(() => {
@@ -397,7 +218,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         isPaused: false,
       };
 
-      setExamTransitionError(null);
       setActiveSession(newSession);
       setIsSessionSummaryView(false);
 
@@ -454,144 +274,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     ).catch(() => {});
   }, [metas, startPracticeSession]);
 
-  const startFullExam = useCallback(
-    async (track: ExamTrack): Promise<Session> => {
-      const seenIds = await getSeenExamQuestionIds();
-      const initialModules = buildInitialExamModules({
-        metas,
-        track,
-        seenIds,
-      });
-
-      const firstModule = initialModules[0];
-      if (!firstModule || firstModule.questionIds.length === 0) {
-        throw new Error(
-          'Unable to assemble Full Practice exam from the question bank.'
-        );
-      }
-
-      addSeenExamQuestionIds(firstModule.questionIds).catch(() => {});
-
-      const questionStates: Record<string, SessionQuestionState> = {};
-      firstModule.questionIds.forEach((qId, idx) => {
-        questionStates[qId] = {
-          questionId: qId,
-          draftAnswer: '',
-          isSubmitted: false,
-          timeSpent: 0,
-          visited: idx === 0,
-        };
-      });
-
-      const titleMap: Record<ExamTrack, string> = {
-        full: 'Full Digital SAT Practice',
-        rw: 'Only Reading & Writing Full Practice',
-        math: 'Only Math Full Practice',
-      };
-
-      const newSession: Session = {
-        id: generateId(),
-        subject: firstModule.subject,
-        mode: 'exam',
-        title: titleMap[track],
-        filters: {
-          subject: firstModule.subject,
-          domains: [],
-          skills: [],
-          difficulties: ['E', 'M', 'H'],
-          difficulty: 'ALL',
-          questionCount: firstModule.questionIds.length,
-        },
-        questionIds: firstModule.questionIds,
-        currentIndex: 0,
-        maxVisitedIndex: 0,
-        questionStates,
-        startedAt: Date.now(),
-        totalTime: 0,
-        isPaused: false,
-        highlightsByQuestion: {},
-        eliminatedByQuestion: {},
-        scratchpadByQuestion: {},
-        exam: {
-          track,
-          phase: 'testing',
-          currentModuleIndex: 0,
-          modules: initialModules,
-          flaggedQuestionIds: [],
-          breakTimeRemainingMs: EXAM_BREAK_TIME_MS,
-          isExamPaused: false,
-        },
-      };
-
-      setExamTransitionError(null);
-      setSavedResumeExam(null);
-      setActiveSession(newSession);
-      setIsSessionSummaryView(false);
-      await saveActiveExamSession(newSession);
-
-      prefetchQuestions(firstModule.questionIds.slice(0, 4));
-      return newSession;
-    },
-    [metas]
-  );
-
-  const clearExamTransitionError = useCallback(() => {
-    setExamTransitionError(null);
-  }, []);
-
-  const resumeSavedExam = useCallback(() => {
-    if (!savedResumeExam || !savedResumeExam.exam) return;
-    const resumed: Session = {
-      ...savedResumeExam,
-      isPaused: false,
-      exam: {
-        ...savedResumeExam.exam,
-        isExamPaused: false,
-      },
-    };
-    setExamTransitionError(null);
-    setSavedResumeExam(null);
-    setActiveSession(resumed);
-    setIsSessionSummaryView(false);
-    const idx = resumed.currentIndex || 0;
-    prefetchQuestions(resumed.questionIds.slice(idx, idx + 4));
-  }, [savedResumeExam]);
-
-  const discardSavedExam = useCallback(async () => {
-    await clearActiveExamSession();
-    setSavedResumeExam(null);
-  }, []);
-
-  const exitAndSaveExam = useCallback(async () => {
-    const cur = activeSessionRef.current;
-    if (!cur || cur.mode !== 'exam' || !cur.exam || cur.completedAt) {
-      setActiveSession(null);
-      setIsSessionSummaryView(false);
-      return;
-    }
-    const pausedSnapshot: Session = {
-      ...cur,
-      isPaused: true,
-      exam: {
-        ...cur.exam,
-        isExamPaused: true,
-      },
-    };
-    await saveActiveExamSession(pausedSnapshot);
-    setExamTransitionError(null);
-    setSavedResumeExam(pausedSnapshot);
-    setHomeTab('full');
-    setActiveSession(null);
-    setIsSessionSummaryView(false);
-  }, []);
-
   const closeActiveSession = useCallback(() => {
-    const cur = activeSessionRef.current;
-    if (cur?.mode === 'exam' && cur.completedAt) {
-      clearActiveExamSession().catch(() => {});
-      setSavedResumeExam(null);
-    }
-    setExamTransitionError(null);
     setActiveSession(null);
     setIsSessionSummaryView(false);
     if (typeof window !== 'undefined' && window.location.search) {
@@ -611,314 +294,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const togglePauseSession = useCallback(() => {
     setActiveSession((prev) => {
       if (!prev || prev.completedAt) return prev;
-      const nextPaused = !prev.isPaused;
       return {
         ...prev,
-        isPaused: nextPaused,
-        exam: prev.exam
-          ? {
-              ...prev.exam,
-              isExamPaused: nextPaused,
-            }
-          : undefined,
+        isPaused: !prev.isPaused,
       };
     });
   }, []);
-
-  const toggleFlagQuestion = useCallback((questionId: string) => {
-    setActiveSession((prev) => {
-      if (!prev || prev.mode !== 'exam' || !prev.exam || prev.completedAt) {
-        return prev;
-      }
-      const existing = prev.exam.flaggedQuestionIds;
-      const nextFlagged = existing.includes(questionId)
-        ? existing.filter((id) => id !== questionId)
-        : [...existing, questionId];
-      return {
-        ...prev,
-        exam: {
-          ...prev.exam,
-          flaggedQuestionIds: nextFlagged,
-        },
-      };
-    });
-  }, []);
-
-  const setExamPhase = useCallback((phase: ExamPhase) => {
-    setExamTransitionError(null);
-    setActiveSession((prev) => {
-      if (!prev || prev.mode !== 'exam' || !prev.exam || prev.completedAt) {
-        return prev;
-      }
-      return {
-        ...prev,
-        exam: {
-          ...prev.exam,
-          phase,
-        },
-      };
-    });
-  }, []);
-
-  const skipExamBreak = useCallback(() => {
-    setActiveSession((prev) => {
-      if (!prev || prev.mode !== 'exam' || !prev.exam || prev.completedAt) {
-        return prev;
-      }
-      return {
-        ...prev,
-        isPaused: false,
-        exam: {
-          ...prev.exam,
-          phase: 'testing',
-          breakTimeRemainingMs: 0,
-          isExamPaused: false,
-        },
-      };
-    });
-  }, []);
-
-  const lockCurrentModuleAndAdvance = useCallback(async () => {
-    if (isTransitioningModuleRef.current) return;
-    const currentSess = activeSessionRef.current;
-    if (
-      !currentSess ||
-      currentSess.mode !== 'exam' ||
-      !currentSess.exam ||
-      currentSess.completedAt
-    ) {
-      return;
-    }
-
-    const activeExam = currentSess.exam;
-    const currentMod = activeExam.modules[activeExam.currentModuleIndex];
-    if (!currentMod || currentMod.locked) return;
-
-    isTransitioningModuleRef.current = true;
-    setIsTransitioningExamModule(true);
-    setExamTransitionError(null);
-
-    try {
-      // Grade all answered items in the active module with bounded concurrency & retry
-      const answeredIds = currentMod.questionIds.filter((qId) => {
-        const draft = currentSess.questionStates[qId]?.draftAnswer.trim();
-        return Boolean(draft);
-      });
-
-      const { detailMap: qDetailMap, failedIds } =
-        await fetchQuestionDetailsWithRetry(answeredIds, 5);
-
-      if (failedIds.length > 0) {
-        setExamTransitionError(
-          `Unable to verify ${failedIds.length} answered question${
-            failedIds.length > 1 ? 's' : ''
-          } due to a network error. Please check your connection and try submitting again.`
-        );
-        // Ensure auto-submitted expired modules land on the review screen instead of staying stuck in testing
-        setActiveSession((prev) => {
-          if (
-            !prev ||
-            prev.id !== currentSess.id ||
-            prev.mode !== 'exam' ||
-            !prev.exam ||
-            prev.exam.phase === 'module-review'
-          ) {
-            return prev;
-          }
-          return {
-            ...prev,
-            exam: {
-              ...prev.exam,
-              phase: 'module-review',
-            },
-          };
-        });
-        return;
-      }
-
-      const nextStates: Record<string, SessionQuestionState> = {
-        ...currentSess.questionStates,
-      };
-      let rawCorrectCount = 0;
-
-      for (const qId of currentMod.questionIds) {
-        const prevSt = nextStates[qId] || {
-          questionId: qId,
-          draftAnswer: '',
-          isSubmitted: false,
-          timeSpent: 0,
-          visited: false,
-        };
-        const draft = prevSt.draftAnswer.trim();
-        const detail = qDetailMap.get(qId);
-        const isCorrect =
-          Boolean(draft) && Boolean(detail)
-            ? evaluateAnswer(detail!, draft)
-            : false;
-
-        if (isCorrect) {
-          rawCorrectCount += 1;
-        }
-
-        nextStates[qId] = {
-          ...prevSt,
-          submittedAnswer: draft,
-          isSubmitted: true,
-          isCorrect,
-        };
-      }
-
-      const lockedCurrentMod = {
-        ...currentMod,
-        locked: true,
-        submittedAt: Date.now(),
-        rawCorrectCount,
-        totalCount: currentMod.questionIds.length,
-      };
-
-      const updatedModules = activeExam.modules.map((m, idx) =>
-        idx === activeExam.currentModuleIndex ? lockedCurrentMod : m
-      );
-
-      const alreadyUsedIds = updatedModules.flatMap((m) => m.questionIds);
-      const seenIds = await getSeenExamQuestionIds();
-
-      // Case 1: Module 1 -> build Adaptive Module 2
-      if (currentMod.moduleNumber === 1) {
-        const nextTier = determineModule2Tier(
-          lockedCurrentMod,
-          nextStates,
-          metaMap
-        );
-        const module2 = buildExamModule({
-          metas,
-          subject: currentMod.subject,
-          moduleNumber: 2,
-          tier: nextTier,
-          seenIds,
-          excludeIds: alreadyUsedIds,
-        });
-        addSeenExamQuestionIds(module2.questionIds).catch(() => {});
-
-        module2.questionIds.forEach((qId, idx) => {
-          nextStates[qId] = {
-            questionId: qId,
-            draftAnswer: '',
-            isSubmitted: false,
-            timeSpent: 0,
-            visited: idx === 0,
-          };
-        });
-
-        const nextSession: Session = {
-          ...currentSess,
-          subject: module2.subject,
-          questionIds: module2.questionIds,
-          currentIndex: 0,
-          maxVisitedIndex: 0,
-          questionStates: nextStates,
-          isPaused: false,
-          exam: {
-            ...activeExam,
-            phase: 'testing',
-            currentModuleIndex: activeExam.currentModuleIndex + 1,
-            modules: [...updatedModules, module2],
-            flaggedQuestionIds: [],
-            isExamPaused: false,
-          },
-        };
-
-        await saveActiveExamSession(nextSession);
-        setActiveSession(nextSession);
-        prefetchQuestions(module2.questionIds.slice(0, 4));
-        return;
-      }
-
-      // Case 2: R&W Module 2 on Full Test -> Build Math M1 & enter 10-min Break
-      if (currentMod.subject === 'rw' && activeExam.track === 'full') {
-        const mathModule1 = buildExamModule({
-          metas,
-          subject: 'math',
-          moduleNumber: 1,
-          tier: 'baseline',
-          seenIds,
-          excludeIds: alreadyUsedIds,
-        });
-        addSeenExamQuestionIds(mathModule1.questionIds).catch(() => {});
-
-        mathModule1.questionIds.forEach((qId, idx) => {
-          nextStates[qId] = {
-            questionId: qId,
-            draftAnswer: '',
-            isSubmitted: false,
-            timeSpent: 0,
-            visited: idx === 0,
-          };
-        });
-
-        const nextSession: Session = {
-          ...currentSess,
-          subject: 'math',
-          questionIds: mathModule1.questionIds,
-          currentIndex: 0,
-          maxVisitedIndex: 0,
-          questionStates: nextStates,
-          isPaused: false,
-          exam: {
-            ...activeExam,
-            phase: 'break',
-            currentModuleIndex: activeExam.currentModuleIndex + 1,
-            modules: [...updatedModules, mathModule1],
-            flaggedQuestionIds: [],
-            breakTimeRemainingMs: EXAM_BREAK_TIME_MS,
-            isExamPaused: false,
-          },
-        };
-
-        await saveActiveExamSession(nextSession);
-        setActiveSession(nextSession);
-        prefetchQuestions(mathModule1.questionIds.slice(0, 4));
-        return;
-      }
-
-      // Case 3: Final Module Completed -> Compute Score Report & Open Summary
-      const allExamQuestionIds = updatedModules.flatMap((m) => m.questionIds);
-      const preliminaryCompleted: Session = {
-        ...currentSess,
-        questionIds: allExamQuestionIds,
-        currentIndex: 0,
-        maxVisitedIndex: Math.max(0, allExamQuestionIds.length - 1),
-        questionStates: nextStates,
-        completedAt: Date.now(),
-        isPaused: true,
-        exam: {
-          ...activeExam,
-          phase: 'completed',
-          modules: updatedModules,
-          flaggedQuestionIds: [],
-          isExamPaused: true,
-        },
-      };
-
-      const scoreReport = computeExamScoreReport(preliminaryCompleted, metaMap);
-      const finalSession: Session = {
-        ...preliminaryCompleted,
-        exam: {
-          ...preliminaryCompleted.exam!,
-          scoreReport,
-        },
-      };
-
-      await clearActiveExamSession();
-      setSavedResumeExam(null);
-      soundEngine.play('complete');
-      setActiveSession(finalSession);
-      setIsSessionSummaryView(true);
-    } finally {
-      isTransitioningModuleRef.current = false;
-      setIsTransitioningExamModule(false);
-    }
-  }, [metaMap, metas]);
 
   const setDraftAnswer = useCallback((questionId: string, draft: string) => {
     setActiveSession((prev) => {
@@ -990,7 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const submitAnswer = useCallback(
     async (question: Question): Promise<Attempt | null> => {
       const currentSess = activeSessionRef.current;
-      if (!currentSess || currentSess.mode === 'exam') return null;
+      if (!currentSess) return null;
 
       const qState = currentSess.questionStates[question.id];
       if (!qState || qState.isSubmitted) return null;
@@ -1037,17 +418,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const goToQuestionIndex = useCallback((index: number) => {
-    setExamTransitionError(null);
     setActiveSession((prev) => {
       if (!prev) return prev;
       const clamped = Math.max(0, Math.min(prev.questionIds.length - 1, index));
-
-      const isLeavingReview =
-        prev.mode === 'exam' &&
-        !prev.completedAt &&
-        prev.exam?.phase === 'module-review';
-
-      if (clamped === prev.currentIndex && !isLeavingReview) return prev;
+      if (clamped === prev.currentIndex) return prev;
 
       const targetQId = prev.questionIds[clamped];
       const nextStates =
@@ -1069,10 +443,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         currentIndex: clamped,
         maxVisitedIndex: Math.max(prev.maxVisitedIndex ?? prev.currentIndex, clamped),
         questionStates: nextStates,
-        exam:
-          isLeavingReview && prev.exam
-            ? { ...prev.exam, phase: 'testing' }
-            : prev.exam,
       };
     });
   }, []);
@@ -1080,11 +450,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const completeSession = useCallback(async () => {
     const currentSess = activeSessionRef.current;
     if (!currentSess) return;
-
-    if (currentSess.mode === 'exam' && !currentSess.completedAt) {
-      await lockCurrentModuleAndAdvance();
-      return;
-    }
 
     soundEngine.play('complete');
 
@@ -1096,7 +461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setActiveSession(completed);
     setIsSessionSummaryView(true);
-  }, [lockCurrentModuleAndAdvance]);
+  }, []);
 
   const syncSessionTime = useCallback(
     (
@@ -1106,56 +471,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     ) => {
       setActiveSession((prev) => {
         if (!prev || prev.isPaused || prev.completedAt) return prev;
-
-        if (prev.mode === 'exam' && prev.exam) {
-          if (prev.exam.isExamPaused || prev.exam.phase === 'completed') {
-            return prev;
-          }
-
-          if (prev.exam.phase === 'break') {
-            const nextBreak = Math.max(
-              0,
-              prev.exam.breakTimeRemainingMs - totalDeltaMs
-            );
-            return {
-              ...prev,
-              exam: {
-                ...prev.exam,
-                breakTimeRemainingMs: nextBreak,
-              },
-            };
-          }
-
-          const modIdx = prev.exam.currentModuleIndex;
-          const activeMod = prev.exam.modules[modIdx];
-          if (!activeMod || activeMod.locked) return prev;
-
-          const nextStates = { ...prev.questionStates };
-          if (questionId && nextStates[questionId]) {
-            nextStates[questionId] = {
-              ...nextStates[questionId],
-              timeSpent: nextStates[questionId].timeSpent + questionDeltaMs,
-            };
-          }
-
-          const nextRemaining = Math.max(
-            0,
-            activeMod.timeRemainingMs - totalDeltaMs
-          );
-          const nextModules = prev.exam.modules.map((m, idx) =>
-            idx === modIdx ? { ...m, timeRemainingMs: nextRemaining } : m
-          );
-
-          return {
-            ...prev,
-            totalTime: prev.totalTime + totalDeltaMs,
-            questionStates: nextStates,
-            exam: {
-              ...prev.exam,
-              modules: nextModules,
-            },
-          };
-        }
 
         const nextStates = { ...prev.questionStates };
         if (questionId && nextStates[questionId]) {
@@ -1187,26 +502,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
-      homeTab,
-      setHomeTab,
       activeSession,
-      savedResumeExam,
-      isTransitioningExamModule,
-      examTransitionError,
-      clearExamTransitionError,
       isSessionSummaryView,
       setIsSessionSummaryView,
       startPracticeSession,
-      startFullExam,
-      resumeSavedExam,
-      discardSavedExam,
-      exitAndSaveExam,
       closeActiveSession,
       togglePauseSession,
-      toggleFlagQuestion,
-      setExamPhase,
-      skipExamBreak,
-      lockCurrentModuleAndAdvance,
       setDraftAnswer,
       setQuestionHighlights,
       setQuestionEliminated,
@@ -1227,25 +528,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
-      homeTab,
-      setHomeTab,
       activeSession,
-      savedResumeExam,
-      isTransitioningExamModule,
-      examTransitionError,
-      clearExamTransitionError,
       isSessionSummaryView,
       startPracticeSession,
-      startFullExam,
-      resumeSavedExam,
-      discardSavedExam,
-      exitAndSaveExam,
       closeActiveSession,
       togglePauseSession,
-      toggleFlagQuestion,
-      setExamPhase,
-      skipExamBreak,
-      lockCurrentModuleAndAdvance,
       setDraftAnswer,
       setQuestionHighlights,
       setQuestionEliminated,

@@ -514,13 +514,6 @@ export function isValidCompleteSprFormat(input: string): boolean {
   return parseNumericValue(cleaned) !== null;
 }
 
-export function isIncompleteSprDraft(draft?: string): boolean {
-  const cleaned = (draft || '').trim();
-  if (!cleaned) return false;
-  if (/^[A-D]$/i.test(cleaned)) return false;
-  return !isValidCompleteSprFormat(cleaned);
-}
-
 export function parseNumericValue(input: string): number | null {
   const cleaned = stripThousandsCommas(input.trim().replace(/\s+/g, ''));
   if (!cleaned) return null;
