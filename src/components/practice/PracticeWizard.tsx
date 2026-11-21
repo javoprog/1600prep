@@ -678,16 +678,37 @@ export const PracticeWizard: React.FC = () => {
                           onClick={() =>
                             toggleSkill(sk.code, dom.primaryClassCd)
                           }
-                          className={`flex items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-xs transition-colors ${
+                          className={`group/skill flex items-center justify-between gap-2.5 rounded-full border px-3.5 py-2 text-left text-xs transition-all duration-150 ${
                             isZeroCount
                               ? 'border-[#1F1F23] bg-[#0A0A0B]/60 text-[#52525B] cursor-not-allowed'
                               : isSkSelected
-                              ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5] cursor-pointer'
-                              : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5] cursor-pointer'
+                              ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] cursor-pointer'
+                              : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:bg-[#141417] hover:text-[#F5F5F5] cursor-pointer'
                           }`}
                         >
-                          <span className="line-clamp-1">{sk.text}</span>
-                          <span className="text-xs tabular-nums text-[#71717A] shrink-0">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                isSkSelected
+                                  ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
+                                  : 'border-[#3F3F46] bg-[#111113] group-hover/skill:border-[#52525B]'
+                              }`}
+                            >
+                              {isSkSelected && (
+                                <Check className="h-2.5 w-2.5 stroke-[3]" />
+                              )}
+                            </span>
+                            <span className="line-clamp-1 font-medium">
+                              {sk.text}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-xs tabular-nums shrink-0 transition-colors ${
+                              isSkSelected
+                                ? 'font-medium text-[#F5F5F5]'
+                                : 'text-[#71717A]'
+                            }`}
+                          >
                             {sk.questionCount}
                           </span>
                         </button>

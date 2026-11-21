@@ -32,6 +32,7 @@ import {
 import { useApp } from '@/context/AppContext';
 import {
   fetchQuestionDetail,
+  getQuestionFromMemory,
   isValidCompleteSprFormat,
 } from '@/services/questionBank';
 import { Question } from '@/types';
@@ -92,6 +93,10 @@ export const QuestionSolver: React.FC = () => {
   const [isResizingDock, setIsResizingDock] = useState<boolean>(false);
   const [footerHeight, setFooterHeight] = useState<number>(65);
   const [isDesktopSmUp, setIsDesktopSmUp] = useState<boolean>(true);
+  const [isDesktopLgUp, setIsDesktopLgUp] = useState<boolean>(true);
+  const [passageSplitRatio, setPassageSplitRatio] = useState<number>(50);
+  const [isResizingPassageSplit, setIsResizingPassageSplit] =
+    useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
   const [isTimerHidden, setIsTimerHidden] = useState<boolean>(false);
@@ -101,7 +106,13 @@ export const QuestionSolver: React.FC = () => {
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState<boolean>(false);
   const footerRef = useRef<HTMLElement | null>(null);
   const navigatorRef = useRef<HTMLDivElement | null>(null);
+  const navigatorGridRef = useRef<HTMLDivElement | null>(null);
   const shortcutsRef = useRef<HTMLDivElement | null>(null);
+  const passageScrollRef = useRef<HTMLDivElement | null>(null);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const feedbackCardRef = useRef<HTMLDivElement | null>(null);
+  const sprInputRef = useRef<HTMLInputElement | null>(null);
+  const justSubmittedIdRef = useRef<string | null>(null);
   const loadRequestIdRef = useRef<number>(0);
   const questionStatesRef = useRef(activeSession?.questionStates);
   questionStatesRef.current = activeSession?.questionStates;
@@ -112,6 +123,7 @@ export const QuestionSolver: React.FC = () => {
       const vw = window.innerWidth;
       const isSmUp = vw >= 640;
       setIsDesktopSmUp(isSmUp);
+      setIsDesktopLgUp(vw >= 1024);
       if (!isSmUp) {
         setIsScratchpadOpen(false);
         setIsScratchBoardOpen(false);
@@ -234,11 +246,21 @@ export const QuestionSolver: React.FC = () => {
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isNavigatorOpen, isShortcutsOpen]);
 
-  // Load current question details with stale-response guard for fast navigation
-  const loadQuestion = useCallback(async (qId: string) => {
+  // Load current question details with instant 0ms in-memory check + stale-response guard
+  const loadQuestion = useCallback(async (qId: string, forceNetwork = false) => {
     const reqId = ++loadRequestIdRef.current;
-    setIsLoadingQuestion(true);
     setQuestionError(null);
+
+    if (!forceNetwork) {
+      const memCached = getQuestionFromMemory(qId);
+      if (memCached && memCached.questionContent) {
+        setQuestion(memCached);
+        setIsLoadingQuestion(false);
+        return;
+      }
+    }
+
+    setIsLoadingQuestion(true);
     try {
       const q = await fetchQuestionDetail(qId);
       if (loadRequestIdRef.current !== reqId) return;
@@ -257,17 +279,81 @@ export const QuestionSolver: React.FC = () => {
     }
   }, []);
 
-  // Sync per-question stopwatch with accumulated question time when switching questions
+  // Sync per-question stopwatch, reset scroll & drawing cursor when switching questions
   useEffect(() => {
     if (currentQuestionId) {
       const storedTime =
         questionStatesRef.current?.[currentQuestionId]?.timeSpent ?? 0;
       setIsShareCopied(false);
+      setIsScratchpadOpen(false);
       setQuestionTimerMs(storedTime);
       lastTickRef.current = Date.now();
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      }
+      if (passageScrollRef.current) {
+        passageScrollRef.current.scrollTop = 0;
+      }
       loadQuestion(currentQuestionId);
     }
   }, [currentQuestionId, loadQuestion]);
+
+  // Smoothly scroll explanation card into comfortable view right after submitting an answer
+  useEffect(() => {
+    if (
+      currentQuestionId &&
+      currentQuestionState?.isSubmitted &&
+      justSubmittedIdRef.current === currentQuestionId
+    ) {
+      justSubmittedIdRef.current = null;
+      const timer = window.setTimeout(() => {
+        feedbackCardRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }, 60);
+      return () => window.clearTimeout(timer);
+    }
+  }, [currentQuestionId, currentQuestionState?.isSubmitted]);
+
+  // Auto-scroll active question tile into view when Question Navigator opens
+  useEffect(() => {
+    if (!isNavigatorOpen) return;
+    const grid = navigatorGridRef.current;
+    if (!grid) return;
+    const activeTile = grid.querySelector<HTMLElement>(
+      '[data-nav-current="true"]'
+    );
+    activeTile?.scrollIntoView({ block: 'nearest' });
+  }, [isNavigatorOpen]);
+
+  // R&W 2-column passage split drag resizer
+  useEffect(() => {
+    if (!isResizingPassageSplit) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const container = splitContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const relX = e.clientX - rect.left;
+      const pct = Math.round((relX / rect.width) * 100);
+      setPassageSplitRatio(Math.max(32, Math.min(68, pct)));
+    };
+
+    const handlePointerUp = () => {
+      setIsResizingPassageSplit(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [isResizingPassageSplit]);
 
   // Per-question Wall-Clock Stopwatch (resets after each question)
   useEffect(() => {
@@ -413,6 +499,7 @@ export const QuestionSolver: React.FC = () => {
       return;
     }
     flushElapsedQuestionTime();
+    justSubmittedIdRef.current = question.id;
     await submitAnswer(question);
   }, [question, canSubmitAnswer, flushElapsedQuestionTime, submitAnswer]);
 
@@ -539,6 +626,44 @@ export const QuestionSolver: React.FC = () => {
   // Math is always a single column with any stimulus equation/table/graph directly above the stem.
   const useSplitPassageColumn = hasPassage && !isMathSubject;
 
+  const normalizeAndApplySprValue = useCallback(
+    (rawVal: string) => {
+      if (isQuestionReadOnly || !currentQuestionId) return;
+      const val = rawVal
+        .replace(/[\u2212\u2013\u2014]/g, '-')
+        .replace(/[\s,]+/g, '')
+        .replace(/^\+/, '');
+      if (!/^-?[0-9./]*$/.test(val)) return;
+      if (val.startsWith('/') || val.startsWith('-/')) return;
+      const maxLen = val.startsWith('-') ? 6 : 5;
+      if (val.length > maxLen) return;
+      const slashCount = (val.match(/\//g) || []).length;
+      const dotCount = (val.match(/\./g) || []).length;
+      if (slashCount > 1 || dotCount > 1 || (slashCount > 0 && dotCount > 0)) {
+        return;
+      }
+      setDraftAnswer(currentQuestionId, val);
+    },
+    [isQuestionReadOnly, currentQuestionId, setDraftAnswer]
+  );
+
+  const handleSprDirectKeyInput = useCallback(
+    (key: string) => {
+      if (isQuestionReadOnly || !currentQuestionState) return;
+      const cur = currentQuestionState.draftAnswer;
+      sprInputRef.current?.focus();
+      if (key === 'Backspace') {
+        normalizeAndApplySprValue(cur.slice(0, -1));
+      } else if (key === '-') {
+        const next = cur.startsWith('-') ? cur.slice(1) : `-${cur}`;
+        normalizeAndApplySprValue(next);
+      } else {
+        normalizeAndApplySprValue(`${cur}${key}`);
+      }
+    },
+    [isQuestionReadOnly, currentQuestionState, normalizeAndApplySprValue]
+  );
+
   usePracticeShortcuts({
     enabled: Boolean(activeSession && currentQuestionId && currentQuestionState),
     isMcq: question?.questionType === 'mcq',
@@ -548,12 +673,17 @@ export const QuestionSolver: React.FC = () => {
     canGoNext: currentIdx < totalQuestions - 1,
     canUseScratchpad: isDesktopSmUp,
     isScratchpadOpen: isScratchpadOpen && isDesktopSmUp,
+    isModalOrPopoverOpen:
+      isExitConfirmOpen || isNavigatorOpen || isShortcutsOpen,
+    isPaused: isSessionPaused,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
     onPrevQuestion: () => handleNavigateToIndex(currentIdx - 1),
     onNextQuestion: () => handleNavigateToIndex(currentIdx + 1),
     onToggleScratchpad: handleToggleScratchpad,
+    onTogglePause: handleTogglePause,
+    onSprKeyInput: handleSprDirectKeyInput,
     onEscape: handleEscapeOverlays,
   });
 
@@ -575,10 +705,10 @@ export const QuestionSolver: React.FC = () => {
 
   const eliminatedForCurrent = eliminatedMap[currentQuestionId] || [];
 
-  const hasAnySessionProgress = Object.values(
-    activeSession.questionStates
-  ).some((st) => st.isSubmitted || Boolean(st.draftAnswer.trim())) ||
-    (activeSession.maxVisitedIndex ?? 0) > 0;
+  const hasAnySessionProgress =
+    Object.values(activeSession.questionStates).some(
+      (st) => st.isSubmitted || Boolean(st.draftAnswer.trim())
+    ) || (activeSession.maxVisitedIndex ?? 0) > 0;
 
   const handleRequestExit = () => {
     soundEngine.play('click');
@@ -595,18 +725,7 @@ export const QuestionSolver: React.FC = () => {
   };
 
   const handleSprChange = (rawVal: string) => {
-    if (isQuestionReadOnly) return;
-    const val = rawVal.trim().replace(/,/g, '');
-    if (!/^-?[0-9./]*$/.test(val)) return;
-    if (val.startsWith('/') || val.startsWith('-/')) return;
-    const maxLen = val.startsWith('-') ? 6 : 5;
-    if (val.length > maxLen) return;
-    const slashCount = (val.match(/\//g) || []).length;
-    const dotCount = (val.match(/\./g) || []).length;
-    if (slashCount > 1 || dotCount > 1 || (slashCount > 0 && dotCount > 0)) {
-      return;
-    }
-    setDraftAnswer(currentQuestionId, val);
+    normalizeAndApplySprValue(rawVal);
   };
 
   const handleSprHelperKey = (symbol: '-' | '/' | '.') => {
@@ -614,10 +733,10 @@ export const QuestionSolver: React.FC = () => {
     const cur = currentQuestionState.draftAnswer;
     if (symbol === '-') {
       const next = cur.startsWith('-') ? cur.slice(1) : `-${cur}`;
-      handleSprChange(next);
+      normalizeAndApplySprValue(next);
       return;
     }
-    handleSprChange(`${cur}${symbol}`);
+    normalizeAndApplySprValue(`${cur}${symbol}`);
   };
 
   const isSprDivisionByZero =
@@ -671,15 +790,19 @@ export const QuestionSolver: React.FC = () => {
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
-          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button) */}
+          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button with subtle hover cue) */}
           <div className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={handleRequestExit}
-              className="group flex items-center rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
+              className="group flex items-center gap-2 rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
               title="Return to main menu"
             >
               <BrandLogo />
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-[#29292E] bg-[#141417] px-2 py-0.5 text-[11px] font-medium text-[#A1A1AA] opacity-0 -translate-x-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0">
+                <ArrowLeft className="h-2.5 w-2.5" />
+                <span>Exit</span>
+              </span>
             </button>
           </div>
 
@@ -856,12 +979,15 @@ export const QuestionSolver: React.FC = () => {
                 <div
                   role="dialog"
                   aria-label="Keyboard shortcuts"
-                  className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-[#29292E] bg-[#111113] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85)] animate-page-fade"
+                  className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-[#29292E] bg-[#111113]/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-page-fade"
                 >
                   <div className="mb-3 flex items-center justify-between border-b border-[#1F1F23] pb-2">
-                    <span className="text-xs font-semibold text-[#F5F5F5]">
-                      Keyboard Shortcuts
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Keyboard className="h-3.5 w-3.5 text-[#69ff00]" />
+                      <span className="text-xs font-semibold text-[#F5F5F5]">
+                        Keyboard Shortcuts
+                      </span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setIsShortcutsOpen(false)}
@@ -875,6 +1001,7 @@ export const QuestionSolver: React.FC = () => {
                     {[
                       { keys: 'A–D / 1–4', desc: 'Select answer choice' },
                       { keys: 'Shift + A–D', desc: 'Cross out / restore choice' },
+                      { keys: '0–9 / - / .', desc: 'Type SPR response' },
                       { keys: 'Enter', desc: 'Check answer / Next question' },
                       { keys: '← / →', desc: 'Previous / Next question' },
                       { keys: 'S', desc: 'Toggle Scratchpad' },
@@ -988,14 +1115,53 @@ export const QuestionSolver: React.FC = () => {
             onClose={() => setIsScratchpadOpen(false)}
           />
 
-          {/* Dedicated Examination Content Container (extra bottom scratch room when active or when overlay ink exists) */}
+          {/* Frosted Session Paused Overlay */}
+          {isSessionPaused && !isQuestionReadOnly && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Session paused"
+              className="absolute inset-0 z-[28] flex items-center justify-center bg-[#0A0A0B]/80 p-4 backdrop-blur-md animate-page-fade"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-[#29292E] bg-[#111113] p-6 text-center shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                  <Pause className="h-5 w-5" />
+                </div>
+                <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
+                  Session Paused
+                </h2>
+                <p className="mt-1.5 text-xs leading-relaxed text-[#A1A1AA]">
+                  Your stopwatch is paused at{' '}
+                  <span className="font-mono font-medium text-[#F5F5F5]">
+                    {formatDuration(questionTimerMs)}
+                  </span>
+                  . Resume whenever you&apos;re ready to continue working on
+                  this question.
+                </p>
+                <div className="mt-6">
+                  <Button3D
+                    variant="primary"
+                    size="lg"
+                    onClick={handleTogglePause}
+                    className="w-full"
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    <span>Resume Practice</span>
+                  </Button3D>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dedicated Examination Content Container (aligned with header & footer max-w-6xl) */}
           <div
-            className={`mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
+            className={`mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
               (isScratchpadOpen || hasOverlayScratchStrokes) && isDesktopSmUp
                 ? 'pb-56 lg:pb-64'
                 : ''
             } ${
-              isScratchpadOpen && isDesktopSmUp
+              (isScratchpadOpen && isDesktopSmUp) ||
+              (isSessionPaused && !isQuestionReadOnly)
                 ? 'pointer-events-none select-none'
                 : ''
             }`}
@@ -1020,7 +1186,7 @@ export const QuestionSolver: React.FC = () => {
               <Button3D
                 variant="primary"
                 size="sm"
-                onClick={() => loadQuestion(currentQuestionId)}
+                onClick={() => loadQuestion(currentQuestionId, true)}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 <span>Retry</span>
@@ -1030,53 +1196,85 @@ export const QuestionSolver: React.FC = () => {
         ) : (
           <div
             key={question.id}
-            className={`grid flex-1 gap-8 lg:gap-12 animate-content-in ${
+            ref={splitContainerRef}
+            style={
+              useSplitPassageColumn && isDesktopLgUp
+                ? {
+                    gridTemplateColumns: `${passageSplitRatio}fr auto ${
+                      100 - passageSplitRatio
+                    }fr`,
+                  }
+                : undefined
+            }
+            className={`grid flex-1 gap-8 lg:gap-0 animate-content-in ${
               useSplitPassageColumn
-                ? 'grid-cols-1 lg:grid-cols-12 items-start'
+                ? 'grid-cols-1 items-start'
                 : 'mx-auto w-full max-w-3xl grid-cols-1'
             }`}
           >
             {/* Left Examination Column: Reading & Writing Passage (when present) */}
             {useSplitPassageColumn && (
-              <div
-                className={`lg:col-span-6 lg:border-r lg:border-[#1F1F23] lg:pr-10 ${
-                  (isScratchpadOpen || hasOverlayScratchStrokes) && isDesktopSmUp
-                    ? ''
-                    : 'lg:sticky lg:top-20 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto'
-                }`}
-              >
-                <div className="mb-4 flex items-center justify-between border-b border-[#1F1F23] pb-2 text-xs text-[#71717A]">
-                  <span>Passage</span>
-                  {currentHighlights.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine.play('clear');
-                        handleUpdateHighlights(currentQuestionId, []);
-                      }}
-                      className="inline-flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-red-300 transition-colors cursor-pointer"
-                      title="Remove all highlights from this passage"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Clear highlights</span>
-                    </button>
-                  )}
+              <>
+                <div
+                  ref={passageScrollRef}
+                  className={`min-w-0 lg:pr-7 ${
+                    (isScratchpadOpen || hasOverlayScratchStrokes) &&
+                    isDesktopSmUp
+                      ? ''
+                      : 'lg:sticky lg:top-20 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto'
+                  }`}
+                >
+                  <div className="mb-4 flex items-center justify-between border-b border-[#1F1F23] pb-2 text-xs text-[#71717A]">
+                    <span>Passage</span>
+                    {currentHighlights.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.play('clear');
+                          handleUpdateHighlights(currentQuestionId, []);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-red-300 transition-colors cursor-pointer"
+                        title="Remove all highlights from this passage"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Clear highlights</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <HighlightablePassage
+                    html={question.passage}
+                    highlights={currentHighlights}
+                    onChangeHighlights={(next) =>
+                      handleUpdateHighlights(currentQuestionId, next)
+                    }
+                  />
                 </div>
 
-                <HighlightablePassage
-                  html={question.passage}
-                  highlights={currentHighlights}
-                  onChangeHighlights={(next) =>
-                    handleUpdateHighlights(currentQuestionId, next)
-                  }
-                />
-              </div>
+                {/* Resizable Vertical Passage / Question Split Handle (Desktop lg+) */}
+                <div
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setIsResizingPassageSplit(true);
+                  }}
+                  onDoubleClick={() => {
+                    soundEngine.play('click');
+                    setPassageSplitRatio(50);
+                  }}
+                  title="Drag to resize passage width (double-click to reset)"
+                  aria-label="Resize passage and question columns"
+                  className="group relative hidden lg:flex h-full min-h-[340px] w-4 cursor-col-resize items-center justify-center select-none"
+                >
+                  <div className="h-full w-px bg-[#1F1F23] transition-colors group-hover:bg-[#3F3F46]" />
+                  <div className="absolute h-10 w-1 rounded-full bg-[#3F3F46] opacity-0 transition-all group-hover:bg-[#69ff00] group-hover:opacity-100" />
+                </div>
+              </>
             )}
 
             {/* Right Examination Column (or Centered Column for Math): Question Stem, Choices, Feedback */}
             <div
               className={`${
-                useSplitPassageColumn ? 'lg:col-span-6' : ''
+                useSplitPassageColumn ? 'lg:pl-7' : ''
               } space-y-8 min-w-0`}
             >
               {/* Question Metadata Header (Single-line Mobile Skill + ID/Difficulty; Full Breadcrumb on sm+) */}
@@ -1126,9 +1324,12 @@ export const QuestionSolver: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
                     {currentMeta?.difficulty && (
                       <span
-                        className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${diffBadge.className}`}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${diffBadge.className}`}
                       >
-                        {diffBadge.label}
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${diffBadge.dotColor}`}
+                        />
+                        <span>{diffBadge.label}</span>
                       </span>
                     )}
 
@@ -1322,6 +1523,7 @@ export const QuestionSolver: React.FC = () => {
                     }`}
                   >
                     <input
+                      ref={sprInputRef}
                       id="spr-answer-input"
                       type="text"
                       inputMode="decimal"
@@ -1425,8 +1627,9 @@ export const QuestionSolver: React.FC = () => {
               {/* Instant Feedback & Explanation Area (shown after submission or when reviewing a completed session) */}
               {isQuestionReadOnly && (
                 <div
+                  ref={feedbackCardRef}
                   aria-live="polite"
-                  className={`overflow-hidden rounded-2xl border border-[#29292E] bg-[#111113] ${
+                  className={`overflow-hidden rounded-2xl border border-[#29292E] bg-[#111113] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${
                     !currentQuestionState.isSubmitted
                       ? 'animate-content-in'
                       : currentQuestionState.isCorrect
@@ -1558,7 +1761,7 @@ export const QuestionSolver: React.FC = () => {
           aria-labelledby="exit-session-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-page-fade"
         >
-          <div className="w-full max-w-md rounded-2xl border border-[#29292E] bg-[#111113] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)]">
+          <div className="w-full max-w-md rounded-2xl border border-[#29292E] bg-[#111113] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)]">
             <h2
               id="exit-session-title"
               className="font-editorial text-2xl text-[#F5F5F5]"
@@ -1660,7 +1863,7 @@ export const QuestionSolver: React.FC = () => {
               <div
                 role="dialog"
                 aria-label="Question Navigator"
-                className="fixed sm:absolute bottom-16 sm:bottom-13 left-1/2 -translate-x-1/2 z-50 w-[min(360px,calc(100vw-24px))] rounded-2xl border border-[#29292E] bg-[#111113] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.85)] animate-page-fade"
+                className="fixed sm:absolute bottom-16 sm:bottom-13 left-1/2 -translate-x-1/2 z-50 w-[min(368px,calc(100vw-24px))] rounded-2xl border border-[#29292E] bg-[#111113]/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-page-fade"
               >
                 <div className="mb-3 flex items-center justify-between border-b border-[#1F1F23] pb-2.5">
                   <div>
@@ -1686,7 +1889,10 @@ export const QuestionSolver: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="grid max-h-60 grid-cols-6 gap-1.5 overflow-y-auto pr-1">
+                <div
+                  ref={navigatorGridRef}
+                  className="grid max-h-60 grid-cols-6 gap-1.5 overflow-y-auto pr-1"
+                >
                   {activeSession.questionIds.map((qId, idx) => {
                     const st = activeSession.questionStates[qId];
                     const isCurrent = idx === currentIdx;
@@ -1714,6 +1920,7 @@ export const QuestionSolver: React.FC = () => {
                       <button
                         key={qId}
                         type="button"
+                        data-nav-current={isCurrent ? 'true' : undefined}
                         onClick={() => {
                           soundEngine.play('navigate');
                           handleNavigateToIndex(idx);
@@ -1725,6 +1932,26 @@ export const QuestionSolver: React.FC = () => {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Compact Navigator Status Legend */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#1F1F23] pt-2.5 text-[11px] text-[#A1A1AA]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-[#69ff00]" />
+                    <span>Current</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span>Correct</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-red-400" />
+                    <span>Incorrect</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full border border-[#3F3F46] bg-[#18181B]" />
+                    <span>Unanswered</span>
+                  </span>
                 </div>
               </div>
             )}

@@ -467,6 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           [question.id]: {
             ...qState,
             submittedAnswer: selectedAnswer,
+            correctAnswer: question.correctAnswer,
             isSubmitted: true,
             isCorrect,
             attemptId: attempt.id,

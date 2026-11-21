@@ -39,8 +39,13 @@ const MAX_RETRIES = 2;
 // In-memory cache & deduplication
 let memoryTaxonomy: TaxonomyData | null = null;
 let memoryMetas: Map<string, QuestionMeta> = new Map();
+const memoryQuestions: Map<string, Question> = new Map();
 let memoryIsOfflineFallback = false;
 const inFlightRequests = new Map<string, Promise<unknown>>();
+
+export function getQuestionFromMemory(questionId: string): Question | undefined {
+  return memoryQuestions.get(questionId);
+}
 
 class NonRetryableHttpError extends Error {
   constructor(message: string) {
@@ -311,9 +316,16 @@ export async function initializeCatalog(forceRefresh = false): Promise<CatalogIn
 }
 
 export async function fetchQuestionDetail(questionId: string): Promise<Question> {
-  // 1. Check full question cache in IndexedDB first
+  // 0. Check in-memory full question cache first for instant 0ms response
+  const memCached = memoryQuestions.get(questionId);
+  if (memCached && memCached.questionContent) {
+    return memCached;
+  }
+
+  // 1. Check full question cache in IndexedDB
   const cached = await getCachedQuestion(questionId);
   if (cached && cached.questionContent) {
+    memoryQuestions.set(questionId, cached);
     return cached;
   }
 
@@ -369,7 +381,8 @@ export async function fetchQuestionDetail(questionId: string): Promise<Question>
     throw new Error(`Question ${questionId} has neither externalId nor ibn`);
   }
 
-  // Save to IndexedDB cache
+  // Save to in-memory and IndexedDB cache
+  memoryQuestions.set(questionId, normalized);
   await saveCachedQuestion(normalized);
   return normalized;
 }

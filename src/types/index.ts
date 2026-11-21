@@ -118,6 +118,7 @@ export interface SessionQuestionState {
   questionId: string;
   draftAnswer: string;
   submittedAnswer?: string;
+  correctAnswer?: string[];
   isSubmitted: boolean;
   isCorrect?: boolean;
   attemptId?: string;
