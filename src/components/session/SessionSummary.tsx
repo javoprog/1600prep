@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { ArrowRight, Plus, RotateCcw } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Button3D } from '@/components/ui/Button3D';
@@ -22,7 +23,6 @@ export const SessionSummary: React.FC = () => {
     triggerWizardReset,
     metaMap,
     user,
-    openAuthModal,
   } = useApp();
 
   if (!activeSession) return null;
@@ -112,22 +112,22 @@ export const SessionSummary: React.FC = () => {
           </p>
 
           {user ? (
-            <button
-              type="button"
-              onClick={() => openAuthModal('results')}
-              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            <Link
+              href="/profile"
+              onClick={() => soundEngine.play('click')}
+              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Saved to {user.name}</span>
-            </button>
+              <span>Saved to {user.name} →</span>
+            </Link>
           ) : (
-            <button
-              type="button"
-              onClick={() => openAuthModal('auth')}
-              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#69ff00] transition-colors cursor-pointer"
+            <Link
+              href="/auth"
+              onClick={() => soundEngine.play('click')}
+              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#69ff00] transition-colors"
             >
               <span>Sign in to save results →</span>
-            </button>
+            </Link>
           )}
         </div>
         <div className="mt-2 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">

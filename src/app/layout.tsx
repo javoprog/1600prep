@@ -3,7 +3,6 @@ import { Inter, Outfit, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
 import { TopNav } from '@/components/layout/TopNav';
-import { AuthAccountModal } from '@/components/auth/AuthAccountModal';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -46,7 +45,6 @@ export default function RootLayout({
             <TopNav />
             <main className="flex-1">{children}</main>
           </div>
-          <AuthAccountModal />
         </AppProvider>
       </body>
     </html>

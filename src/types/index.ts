@@ -156,24 +156,8 @@ export interface UserSettings {
 export interface UserProfile {
   id: string;
   name: string;
-  email: string | null;
-  avatarUrl: string | null;
-  hasPassword: boolean;
-  googleConnected: boolean;
-  googleEmail: string | null;
-  telegramConnected: boolean;
-  telegramId: string | null;
-  telegramUsername: string | null;
-  telegramFirstName: string | null;
+  email: string;
   createdAt: string;
-}
-
-export interface AuthProviderConfig {
-  googleEnabled: boolean;
-  googleClientId: string | null;
-  telegramBotEnabled: boolean;
-  telegramWidgetEnabled: boolean;
-  telegramBotUsername: string | null;
 }
 
 export interface SavedSessionItem {

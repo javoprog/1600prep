@@ -1,6 +1,5 @@
 import {
   Attempt,
-  AuthProviderConfig,
   SavedResultsSummary,
   SavedSessionItem,
   Session,
@@ -13,31 +12,6 @@ const API_BASE_URL = (
 
 const AUTH_TOKEN_KEY = '1600prep_auth_token_v1';
 const PENDING_GUEST_RESULTS_KEY = '1600prep_guest_results_buffer_v1';
-
-export interface TelegramWidgetPayload {
-  id: string | number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: number | string;
-  hash: string;
-}
-
-export interface TelegramBotSessionResponse {
-  sessionToken: string;
-  code: string;
-  botUsername: string | null;
-  deepLink: string | null;
-  expiresAt: string;
-}
-
-export interface TelegramLinkCodeResponse {
-  code: string;
-  botUsername: string | null;
-  deepLink: string | null;
-  expiresAt: string;
-}
 
 export interface AuthResponse {
   token: string;
@@ -190,12 +164,8 @@ async function apiRequest<T>(
 }
 
 // ============================================================================
-// AUTH ENDPOINTS
+// AUTH & PROFILE ENDPOINTS
 // ============================================================================
-
-export async function fetchAuthConfig(): Promise<AuthProviderConfig> {
-  return apiRequest<AuthProviderConfig>('/auth/config');
-}
 
 export async function registerWithEmail(payload: {
   name?: string;
@@ -218,108 +188,43 @@ export async function loginWithEmail(payload: {
   });
 }
 
-export async function authWithGoogle(
-  credential: string
-): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>('/auth/google', {
-    method: 'POST',
-    body: JSON.stringify({ credential }),
-  });
-}
-
-export async function authWithTelegramWidget(
-  payload: TelegramWidgetPayload
-): Promise<AuthResponse> {
-  return apiRequest<AuthResponse>('/auth/telegram/widget', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function createTelegramBotSession(): Promise<TelegramBotSessionResponse> {
-  return apiRequest<TelegramBotSessionResponse>('/auth/telegram/bot-session', {
-    method: 'POST',
-  });
-}
-
-export async function pollTelegramBotSession(
-  sessionToken: string
-): Promise<
-  | { status: 'PENDING'; code: string; expiresAt: string }
-  | { status: 'EXPIRED' }
-  | { status: 'COMPLETED'; token: string; user: UserProfile }
-> {
-  return apiRequest(`/auth/telegram/bot-session/${encodeURIComponent(sessionToken)}`);
-}
-
 export async function fetchCurrentUser(token: string): Promise<UserProfile> {
   return apiRequest<UserProfile>('/auth/me', {}, token);
 }
 
-// ============================================================================
-// ACCOUNT LINKING & UNLINKING ENDPOINTS
-// ============================================================================
-
-export async function linkEmailToAccount(
+export async function updateUserProfile(
   token: string,
-  payload: { email: string; password: string; name?: string }
+  payload: { name?: string; email?: string }
 ): Promise<UserProfile> {
   return apiRequest<UserProfile>(
-    '/auth/link/email',
+    '/auth/profile',
     {
-      method: 'POST',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     },
     token
   );
 }
 
-export async function linkGoogleToAccount(
+export async function changeUserPassword(
   token: string,
-  credential: string
-): Promise<UserProfile> {
-  return apiRequest<UserProfile>(
-    '/auth/link/google',
+  payload: { currentPassword: string; newPassword: string }
+): Promise<{ updated: boolean }> {
+  return apiRequest<{ updated: boolean }>(
+    '/auth/password',
     {
-      method: 'POST',
-      body: JSON.stringify({ credential }),
-    },
-    token
-  );
-}
-
-export async function linkTelegramWidgetToAccount(
-  token: string,
-  payload: TelegramWidgetPayload
-): Promise<UserProfile> {
-  return apiRequest<UserProfile>(
-    '/auth/link/telegram-widget',
-    {
-      method: 'POST',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     },
     token
   );
 }
 
-export async function createTelegramLinkCode(
+export async function deleteUserAccount(
   token: string
-): Promise<TelegramLinkCodeResponse> {
-  return apiRequest<TelegramLinkCodeResponse>(
-    '/auth/link/telegram-code',
-    {
-      method: 'POST',
-    },
-    token
-  );
-}
-
-export async function unlinkProviderFromAccount(
-  token: string,
-  provider: 'google' | 'telegram' | 'password'
-): Promise<UserProfile> {
-  return apiRequest<UserProfile>(
-    `/auth/unlink/${provider}`,
+): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(
+    '/auth/account',
     {
       method: 'DELETE',
     },

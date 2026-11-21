@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import {
   Attempt,
-  AuthProviderConfig,
   PassageHighlight,
   PracticeFilters,
   PracticeMode,
@@ -44,7 +43,6 @@ import {
   bufferGuestSession,
   clearGuestResultsBuffer,
   clearResultsOnBackend,
-  fetchAuthConfig,
   fetchCurrentUser,
   fetchResultsSummary,
   getStoredAuthToken,
@@ -55,8 +53,6 @@ import {
   setStoredAuthToken,
   syncGuestResultsToBackend,
 } from '@/services/api/backendApi';
-
-export type AuthModalTab = 'auth' | 'results' | 'account';
 
 interface AppContextValue {
   // Catalog
@@ -77,12 +73,7 @@ interface AppContextValue {
   user: UserProfile | null;
   authToken: string | null;
   isAuthLoading: boolean;
-  authConfig: AuthProviderConfig | null;
   savedResults: SavedResultsSummary | null;
-  isAuthModalOpen: boolean;
-  authModalTab: AuthModalTab;
-  openAuthModal: (tab?: AuthModalTab) => void;
-  closeAuthModal: () => void;
   handleAuthSuccess: (token: string, user: UserProfile) => Promise<void>;
   setUserProfile: (user: UserProfile) => void;
   refreshUserAndResults: () => Promise<void>;
@@ -153,11 +144,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [authToken, setAuthToken] = useState<string | null>(null);
   const authTokenRef = useRef<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-  const [authConfig, setAuthConfig] = useState<AuthProviderConfig | null>(null);
   const [savedResults, setSavedResults] =
     useState<SavedResultsSummary | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [authModalTab, setAuthModalTab] = useState<AuthModalTab>('auth');
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [isSessionSummaryView, setIsSessionSummaryView] =
@@ -250,7 +238,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setAuthToken(null);
     setUser(null);
     setSavedResults(null);
-    setIsAuthModalOpen(false);
   }, []);
 
   const clearSavedResults = useCallback(async () => {
@@ -260,22 +247,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     clearGuestResultsBuffer();
     const summary = await fetchResultsSummary(token);
     setSavedResults(summary);
-  }, []);
-
-  const openAuthModal = useCallback(
-    (tab?: AuthModalTab) => {
-      if (tab) {
-        setAuthModalTab(tab);
-      } else {
-        setAuthModalTab(user ? 'results' : 'auth');
-      }
-      setIsAuthModalOpen(true);
-    },
-    [user]
-  );
-
-  const closeAuthModal = useCallback(() => {
-    setIsAuthModalOpen(false);
   }, []);
 
   useEffect(() => {
@@ -297,11 +268,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           setIsSessionSummaryView(persisted.isSessionSummaryView);
         }
       }
-
-      // Initialize optional backend auth config & stored session token asynchronously
-      fetchAuthConfig()
-        .then((cfg) => setAuthConfig(cfg))
-        .catch(() => {});
 
       const storedToken = getStoredAuthToken();
       if (storedToken) {
@@ -818,12 +784,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       user,
       authToken,
       isAuthLoading,
-      authConfig,
       savedResults,
-      isAuthModalOpen,
-      authModalTab,
-      openAuthModal,
-      closeAuthModal,
       handleAuthSuccess,
       setUserProfile,
       refreshUserAndResults,
@@ -860,12 +821,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       user,
       authToken,
       isAuthLoading,
-      authConfig,
       savedResults,
-      isAuthModalOpen,
-      authModalTab,
-      openAuthModal,
-      closeAuthModal,
       handleAuthSuccess,
       setUserProfile,
       refreshUserAndResults,

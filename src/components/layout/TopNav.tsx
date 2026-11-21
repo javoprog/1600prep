@@ -15,7 +15,6 @@ export const TopNav: React.FC = () => {
     updateSettings,
     user,
     savedResults,
-    openAuthModal,
     activeSession,
     isSessionSummaryView,
     closeActiveSession,
@@ -26,6 +25,9 @@ export const TopNav: React.FC = () => {
   if (pathname === '/' && activeSession && !isSessionSummaryView) {
     return null;
   }
+
+  const isAuthOrProfileActive =
+    pathname === '/auth' || pathname === '/profile';
 
   return (
     <header className="sticky top-0 z-40 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
@@ -48,7 +50,7 @@ export const TopNav: React.FC = () => {
           <BrandLogo />
         </Link>
 
-        {/* Right Controls: Sound Toggle + Optional Auth / Saved Results */}
+        {/* Right Controls: Sound Toggle + Dedicated Profile / Auth Page Link */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -80,14 +82,15 @@ export const TopNav: React.FC = () => {
           </button>
 
           {user ? (
-            <button
-              type="button"
+            <Link
+              href="/profile"
               onMouseEnter={() => soundEngine.play('hover')}
-              onClick={() => {
-                soundEngine.play('click');
-                openAuthModal('results');
-              }}
-              className="flex h-8 items-center gap-2 rounded-full border border-[#29292E] bg-[#111113] px-3 text-xs font-medium text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#18181B] transition-colors cursor-pointer"
+              onClick={() => soundEngine.play('click')}
+              className={`flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-medium transition-colors ${
+                isAuthOrProfileActive
+                  ? 'border-[#3F3F46] bg-[#18181B] text-[#F5F5F5]'
+                  : 'border-[#29292E] bg-[#111113] text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#18181B]'
+              }`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#69ff00]" />
               <span className="max-w-[120px] truncate">{user.name}</span>
@@ -96,20 +99,21 @@ export const TopNav: React.FC = () => {
                   {savedResults.accuracyPercent}%
                 </span>
               )}
-            </button>
+            </Link>
           ) : (
-            <button
-              type="button"
+            <Link
+              href="/auth"
               onMouseEnter={() => soundEngine.play('hover')}
-              onClick={() => {
-                soundEngine.play('click');
-                openAuthModal('auth');
-              }}
-              className="flex h-8 items-center gap-1.5 rounded-full border border-[#29292E] bg-[#111113] px-3 text-xs font-medium text-[#A1A1AA] hover:border-[#3F3F46] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              onClick={() => soundEngine.play('click')}
+              className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${
+                isAuthOrProfileActive
+                  ? 'border-[#3F3F46] bg-[#18181B] text-[#F5F5F5]'
+                  : 'border-[#29292E] bg-[#111113] text-[#A1A1AA] hover:border-[#3F3F46] hover:bg-[#18181B] hover:text-[#F5F5F5]'
+              }`}
             >
               <User className="h-3.5 w-3.5" />
               <span>Sign in</span>
-            </button>
+            </Link>
           )}
         </div>
       </div>
