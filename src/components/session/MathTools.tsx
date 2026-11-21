@@ -3,10 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import katex from 'katex';
 import {
-  BookOpen,
-  Calculator,
   GripHorizontal,
-  HelpCircle,
   Moon,
   Sun,
   X,
@@ -576,7 +573,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
                   ? 'border-r border-[#29292E]'
                   : 'border-l border-[#29292E]'
               } shadow-[0_12px_40px_rgba(0,0,0,0.45)]`
-            : 'z-40 rounded-2xl border border-[#29292E] shadow-[0_24px_60px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)]'
+            : 'z-40 rounded-2xl border border-[#3F3F46] shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
         } ${
           isOpen
             ? 'flex opacity-100 pointer-events-auto'
@@ -622,13 +619,12 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
           } ${isMobileViewport || isDocked ? '' : 'rounded-t-2xl'}`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <Calculator className="h-3.5 w-3.5 shrink-0 text-[#69ff00]" />
+            {!isMobileViewport && (
+              <GripHorizontal className="h-4 w-4 shrink-0 text-[#71717A]" />
+            )}
             <span className="text-xs font-semibold text-[#F5F5F5] truncate">
               Calculator
             </span>
-            {!isMobileViewport && (
-              <GripHorizontal className="h-3.5 w-3.5 shrink-0 text-[#52525B]" />
-            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -739,7 +735,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
       className={
         isMobileViewport
           ? 'fixed inset-0 z-50 flex flex-col bg-[#111113] rounded-none border-0 shadow-none select-none'
-          : 'fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#29292E] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] select-none'
+          : 'fixed z-40 flex w-[680px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none'
       }
       role="dialog"
       aria-label="Reference Sheet"
@@ -752,13 +748,12 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
         }`}
       >
         <div className="flex items-center gap-2">
-          <BookOpen className="h-3.5 w-3.5 shrink-0 text-[#69ff00]" />
+          {!isMobileViewport && (
+            <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          )}
           <span className="text-xs font-semibold text-[#F5F5F5]">
             Reference Sheet
           </span>
-          {!isMobileViewport && (
-            <GripHorizontal className="h-3.5 w-3.5 text-[#52525B]" />
-          )}
         </div>
 
         <button
@@ -1013,7 +1008,7 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
       className={
         isMobileViewport
           ? 'fixed inset-0 z-50 flex flex-col bg-[#111113] rounded-none border-0 shadow-none select-none'
-          : 'fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#29292E] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] select-none'
+          : 'fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none'
       }
       role="dialog"
       aria-label="Student-Produced Response Directions"
@@ -1026,13 +1021,12 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
         }`}
       >
         <div className="flex items-center gap-2">
-          <HelpCircle className="h-3.5 w-3.5 shrink-0 text-[#69ff00]" />
+          {!isMobileViewport && (
+            <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          )}
           <span className="text-xs font-semibold text-[#F5F5F5]">
             Student-Produced Response Directions
           </span>
-          {!isMobileViewport && (
-            <GripHorizontal className="h-3.5 w-3.5 text-[#52525B]" />
-          )}
         </div>
 
         <button

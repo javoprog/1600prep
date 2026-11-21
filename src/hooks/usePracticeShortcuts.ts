@@ -12,15 +12,12 @@ export interface UsePracticeShortcutsParams {
   canGoNext: boolean;
   canUseScratchpad?: boolean;
   isScratchpadOpen?: boolean;
-  isModalOrPopoverOpen?: boolean;
-  isPaused?: boolean;
   onSelectOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onToggleEliminateOption: (label: 'A' | 'B' | 'C' | 'D') => void;
   onSubmitAnswer: () => void;
   onPrevQuestion: () => void;
   onNextQuestion: () => void;
   onToggleScratchpad: () => void;
-  onTogglePause?: () => void;
   onSprKeyInput?: (key: string) => void;
   onEscape: () => boolean; // returns true if an overlay/modal was closed
 }
@@ -34,15 +31,12 @@ export function usePracticeShortcuts({
   canGoNext,
   canUseScratchpad = true,
   isScratchpadOpen = false,
-  isModalOrPopoverOpen = false,
-  isPaused = false,
   onSelectOption,
   onToggleEliminateOption,
   onSubmitAnswer,
   onPrevQuestion,
   onNextQuestion,
   onToggleScratchpad,
-  onTogglePause,
   onSprKeyInput,
   onEscape,
 }: UsePracticeShortcutsParams): void {
@@ -64,27 +58,12 @@ export function usePracticeShortcuts({
         return;
       }
 
-      // Escape: close any open modal, popover, or scratchpad
+      // Escape: close any open tool or scratchpad
       if (e.key === 'Escape') {
         const closed = onEscape();
         if (closed) {
           e.preventDefault();
           soundEngine.play('toggleClose');
-        }
-        return;
-      }
-
-      // Block background shortcuts while a modal or popover is open
-      if (isModalOrPopoverOpen) {
-        return;
-      }
-
-      // While session is paused, allow Space or P to resume and block answer/navigation shortcuts
-      if (isPaused && !isSubmitted) {
-        if (e.key === ' ' || e.key === 'p' || e.key === 'P') {
-          if (target?.closest('button, a, [role="button"]')) return;
-          e.preventDefault();
-          onTogglePause?.();
         }
         return;
       }
@@ -192,15 +171,12 @@ export function usePracticeShortcuts({
     canGoNext,
     canUseScratchpad,
     isScratchpadOpen,
-    isModalOrPopoverOpen,
-    isPaused,
     onSelectOption,
     onToggleEliminateOption,
     onSubmitAnswer,
     onPrevQuestion,
     onNextQuestion,
     onToggleScratchpad,
-    onTogglePause,
     onSprKeyInput,
     onEscape,
   ]);

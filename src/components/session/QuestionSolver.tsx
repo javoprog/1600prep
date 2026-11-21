@@ -10,16 +10,11 @@ import {
   Calculator,
   Check,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Eye,
   EyeOff,
-  Keyboard,
   Loader2,
-  Pause,
   PenTool,
-  Play,
   RefreshCw,
   Share2,
   Trash2,
@@ -74,7 +69,6 @@ export const QuestionSolver: React.FC = () => {
     goToQuestionIndex,
     completeSession,
     closeActiveSession,
-    togglePauseSession,
     syncSessionTime,
     setIsSessionSummaryView,
     metaMap,
@@ -93,23 +87,12 @@ export const QuestionSolver: React.FC = () => {
   const [isResizingDock, setIsResizingDock] = useState<boolean>(false);
   const [footerHeight, setFooterHeight] = useState<number>(65);
   const [isDesktopSmUp, setIsDesktopSmUp] = useState<boolean>(true);
-  const [isDesktopLgUp, setIsDesktopLgUp] = useState<boolean>(true);
-  const [passageSplitRatio, setPassageSplitRatio] = useState<number>(50);
-  const [isResizingPassageSplit, setIsResizingPassageSplit] =
-    useState<boolean>(false);
   const [isReferenceOpen, setIsReferenceOpen] = useState<boolean>(false);
   const [isSprDirectionsOpen, setIsSprDirectionsOpen] = useState<boolean>(false);
   const [isTimerHidden, setIsTimerHidden] = useState<boolean>(false);
   const [isShareCopied, setIsShareCopied] = useState<boolean>(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
-  const [isNavigatorOpen, setIsNavigatorOpen] = useState<boolean>(false);
-  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState<boolean>(false);
   const footerRef = useRef<HTMLElement | null>(null);
-  const navigatorRef = useRef<HTMLDivElement | null>(null);
-  const navigatorGridRef = useRef<HTMLDivElement | null>(null);
-  const shortcutsRef = useRef<HTMLDivElement | null>(null);
   const passageScrollRef = useRef<HTMLDivElement | null>(null);
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const feedbackCardRef = useRef<HTMLDivElement | null>(null);
   const sprInputRef = useRef<HTMLInputElement | null>(null);
   const justSubmittedIdRef = useRef<string | null>(null);
@@ -123,7 +106,6 @@ export const QuestionSolver: React.FC = () => {
       const vw = window.innerWidth;
       const isSmUp = vw >= 640;
       setIsDesktopSmUp(isSmUp);
-      setIsDesktopLgUp(vw >= 1024);
       if (!isSmUp) {
         setIsScratchpadOpen(false);
         setIsScratchBoardOpen(false);
@@ -187,7 +169,6 @@ export const QuestionSolver: React.FC = () => {
   );
 
   const isCompletedSession = Boolean(activeSession?.completedAt);
-  const isSessionPaused = Boolean(activeSession?.isPaused);
   const isQuestionReadOnly =
     Boolean(currentQuestionState?.isSubmitted) || isCompletedSession;
 
@@ -195,7 +176,6 @@ export const QuestionSolver: React.FC = () => {
     if (
       !activeSession ||
       isCompletedSession ||
-      isSessionPaused ||
       isLoadingQuestion ||
       currentQuestionState?.isSubmitted ||
       !currentQuestionId
@@ -213,38 +193,11 @@ export const QuestionSolver: React.FC = () => {
   }, [
     activeSession,
     isCompletedSession,
-    isSessionPaused,
     isLoadingQuestion,
     currentQuestionState?.isSubmitted,
     currentQuestionId,
     syncSessionTime,
   ]);
-
-  // Close popovers on outside click
-  useEffect(() => {
-    if (!isNavigatorOpen && !isShortcutsOpen) return;
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (
-        isNavigatorOpen &&
-        navigatorRef.current &&
-        target &&
-        !navigatorRef.current.contains(target)
-      ) {
-        setIsNavigatorOpen(false);
-      }
-      if (
-        isShortcutsOpen &&
-        shortcutsRef.current &&
-        target &&
-        !shortcutsRef.current.contains(target)
-      ) {
-        setIsShortcutsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [isNavigatorOpen, isShortcutsOpen]);
 
   // Load current question details with instant 0ms in-memory check + stale-response guard
   const loadQuestion = useCallback(async (qId: string, forceNetwork = false) => {
@@ -316,51 +269,11 @@ export const QuestionSolver: React.FC = () => {
     }
   }, [currentQuestionId, currentQuestionState?.isSubmitted]);
 
-  // Auto-scroll active question tile into view when Question Navigator opens
-  useEffect(() => {
-    if (!isNavigatorOpen) return;
-    const grid = navigatorGridRef.current;
-    if (!grid) return;
-    const activeTile = grid.querySelector<HTMLElement>(
-      '[data-nav-current="true"]'
-    );
-    activeTile?.scrollIntoView({ block: 'nearest' });
-  }, [isNavigatorOpen]);
-
-  // R&W 2-column passage split drag resizer
-  useEffect(() => {
-    if (!isResizingPassageSplit) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const container = splitContainerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const relX = e.clientX - rect.left;
-      const pct = Math.round((relX / rect.width) * 100);
-      setPassageSplitRatio(Math.max(32, Math.min(68, pct)));
-    };
-
-    const handlePointerUp = () => {
-      setIsResizingPassageSplit(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-    };
-  }, [isResizingPassageSplit]);
-
   // Per-question Wall-Clock Stopwatch (resets after each question)
   useEffect(() => {
     if (
       !activeSession ||
       isCompletedSession ||
-      isSessionPaused ||
       isLoadingQuestion ||
       currentQuestionState?.isSubmitted
     ) {
@@ -406,7 +319,6 @@ export const QuestionSolver: React.FC = () => {
   }, [
     activeSession?.id,
     isCompletedSession,
-    isSessionPaused,
     isLoadingQuestion,
     currentQuestionId,
     currentQuestionState?.isSubmitted,
@@ -419,7 +331,6 @@ export const QuestionSolver: React.FC = () => {
   const handleNavigateToIndex = useCallback(
     (targetIdx: number) => {
       flushElapsedQuestionTime();
-      setIsNavigatorOpen(false);
       goToQuestionIndex(targetIdx);
     },
     [flushElapsedQuestionTime, goToQuestionIndex]
@@ -427,27 +338,8 @@ export const QuestionSolver: React.FC = () => {
 
   const handleCompleteSession = useCallback(async () => {
     flushElapsedQuestionTime();
-    setIsExitConfirmOpen(false);
-    setIsNavigatorOpen(false);
     await completeSession();
   }, [flushElapsedQuestionTime, completeSession]);
-
-  const handleTogglePause = useCallback(() => {
-    if (isCompletedSession || currentQuestionState?.isSubmitted) return;
-    if (!isSessionPaused) {
-      flushElapsedQuestionTime();
-    } else {
-      lastTickRef.current = Date.now();
-    }
-    soundEngine.play('click');
-    togglePauseSession();
-  }, [
-    isCompletedSession,
-    currentQuestionState?.isSubmitted,
-    isSessionPaused,
-    flushElapsedQuestionTime,
-    togglePauseSession,
-  ]);
 
   const handleSelectMcq = useCallback(
     (label: string) => {
@@ -577,18 +469,6 @@ export const QuestionSolver: React.FC = () => {
   );
 
   const handleEscapeOverlays = useCallback((): boolean => {
-    if (isExitConfirmOpen) {
-      setIsExitConfirmOpen(false);
-      return true;
-    }
-    if (isNavigatorOpen) {
-      setIsNavigatorOpen(false);
-      return true;
-    }
-    if (isShortcutsOpen) {
-      setIsShortcutsOpen(false);
-      return true;
-    }
     if (isScratchpadOpen) {
       setIsScratchpadOpen(false);
       return true;
@@ -607,9 +487,6 @@ export const QuestionSolver: React.FC = () => {
     }
     return false;
   }, [
-    isExitConfirmOpen,
-    isNavigatorOpen,
-    isShortcutsOpen,
     isScratchpadOpen,
     isSprDirectionsOpen,
     isReferenceOpen,
@@ -673,16 +550,12 @@ export const QuestionSolver: React.FC = () => {
     canGoNext: currentIdx < totalQuestions - 1,
     canUseScratchpad: isDesktopSmUp,
     isScratchpadOpen: isScratchpadOpen && isDesktopSmUp,
-    isModalOrPopoverOpen:
-      isExitConfirmOpen || isNavigatorOpen || isShortcutsOpen,
-    isPaused: isSessionPaused,
     onSelectOption: handleSelectMcq,
     onToggleEliminateOption: handleToggleEliminateOption,
     onSubmitAnswer: handleSubmit,
     onPrevQuestion: () => handleNavigateToIndex(currentIdx - 1),
     onNextQuestion: () => handleNavigateToIndex(currentIdx + 1),
     onToggleScratchpad: handleToggleScratchpad,
-    onTogglePause: handleTogglePause,
     onSprKeyInput: handleSprDirectKeyInput,
     onEscape: handleEscapeOverlays,
   });
@@ -704,20 +577,6 @@ export const QuestionSolver: React.FC = () => {
   const footerNavBtnClass = `${footerBtnClass} min-w-[90px] sm:min-w-[108px]`;
 
   const eliminatedForCurrent = eliminatedMap[currentQuestionId] || [];
-
-  const hasAnySessionProgress =
-    Object.values(activeSession.questionStates).some(
-      (st) => st.isSubmitted || Boolean(st.draftAnswer.trim())
-    ) || (activeSession.maxVisitedIndex ?? 0) > 0;
-
-  const handleRequestExit = () => {
-    soundEngine.play('click');
-    if (!isCompletedSession && hasAnySessionProgress) {
-      setIsExitConfirmOpen(true);
-    } else {
-      closeActiveSession();
-    }
-  };
 
   const toggleEliminateOption = (label: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -790,35 +649,26 @@ export const QuestionSolver: React.FC = () => {
       {/* Dedicated Examination Top Header */}
       <header className="sticky top-0 z-30 h-16 w-full border-b border-[#1F1F23] bg-[#0A0A0B]/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
-          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button with subtle hover cue) */}
+          {/* Left: 1600prep Brand Mark & Wordmark (serves as Exit button) */}
           <div className="flex shrink-0 items-center">
             <button
               type="button"
-              onClick={handleRequestExit}
-              className="group flex items-center gap-2 rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
+              onClick={() => {
+                soundEngine.play('click');
+                closeActiveSession();
+              }}
+              className="group flex items-center rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
               title="Return to main menu"
             >
               <BrandLogo />
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-[#29292E] bg-[#141417] px-2 py-0.5 text-[11px] font-medium text-[#A1A1AA] opacity-0 -translate-x-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0">
-                <ArrowLeft className="h-2.5 w-2.5" />
-                <span>Exit</span>
-              </span>
             </button>
           </div>
 
-          {/* Center (lg+): Question Timer with Pause & Hide/Show Toggles */}
+          {/* Center (lg+): Question Timer with Minimal Icon-Only Hide/Show Toggle */}
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 lg:absolute lg:left-1/2 lg:-translate-x-1/2">
             <span
-              className={`font-mono text-base sm:text-xl font-medium tabular-nums tracking-tight transition-colors ${
-                isSessionPaused && !isQuestionReadOnly
-                  ? 'text-amber-400'
-                  : 'text-[#F5F5F5]'
-              }`}
-              title={
-                isSessionPaused && !isQuestionReadOnly
-                  ? 'Session paused'
-                  : 'Question elapsed time'
-              }
+              className="font-mono text-base sm:text-xl font-medium tabular-nums tracking-tight text-[#F5F5F5]"
+              title="Question elapsed time"
             >
               {isTimerHidden
                 ? '—'
@@ -829,34 +679,13 @@ export const QuestionSolver: React.FC = () => {
                   )}
             </span>
 
-            {!isQuestionReadOnly && (
-              <button
-                type="button"
-                onClick={handleTogglePause}
-                className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full transition-colors cursor-pointer ${
-                  isSessionPaused
-                    ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
-                    : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
-                }`}
-                title={isSessionPaused ? 'Resume timer' : 'Pause timer'}
-                aria-label={isSessionPaused ? 'Resume timer' : 'Pause timer'}
-                aria-pressed={isSessionPaused}
-              >
-                {isSessionPaused ? (
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                ) : (
-                  <Pause className="h-3.5 w-3.5" />
-                )}
-              </button>
-            )}
-
             <button
               type="button"
               onClick={() => {
                 soundEngine.play('click');
                 setIsTimerHidden((prev) => !prev);
               }}
-              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isTimerHidden ? 'Show timer' : 'Hide timer'}
               aria-label={isTimerHidden ? 'Show timer' : 'Hide timer'}
             >
@@ -868,9 +697,9 @@ export const QuestionSolver: React.FC = () => {
             </button>
           </div>
 
-          {/* Right: Workspace Tools (Calculator, Reference on all screens; Scratchpad sm+) + Share + Shortcuts + Sound */}
-          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1.5">
-            <div className="flex items-center gap-0.5 sm:gap-1.5">
+          {/* Right: Workspace Tools (Calculator, Reference on all screens; Scratchpad sm+) + Share + Sound */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5">
               {isMathSubject && (
                 <>
                   <button
@@ -882,7 +711,7 @@ export const QuestionSolver: React.FC = () => {
                         return next;
                       });
                     }}
-                    className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
+                    className={`inline-flex h-8 w-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                       isCalculatorOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
                         : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
@@ -904,7 +733,7 @@ export const QuestionSolver: React.FC = () => {
                         return next;
                       });
                     }}
-                    className={`inline-flex h-7 w-7 sm:h-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
+                    className={`inline-flex h-8 w-8 sm:w-auto items-center justify-center gap-1.5 rounded-full sm:px-3 text-xs transition-colors cursor-pointer ${
                       isReferenceOpen
                         ? 'bg-[#18181B] text-[#69ff00]'
                         : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
@@ -941,7 +770,7 @@ export const QuestionSolver: React.FC = () => {
             <button
               type="button"
               onClick={handleShareQuestion}
-              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
               title={isShareCopied ? 'Link copied!' : 'Copy link to this question'}
               aria-label="Copy link to this question"
             >
@@ -952,77 +781,7 @@ export const QuestionSolver: React.FC = () => {
               )}
             </button>
 
-            {/* Keyboard Shortcuts Legend Popover (Desktop/Tablet sm+) */}
-            <div ref={shortcutsRef} className="relative hidden sm:block">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsShortcutsOpen((prev) => {
-                    const next = !prev;
-                    soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                    return next;
-                  });
-                }}
-                className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer ${
-                  isShortcutsOpen
-                    ? 'bg-[#18181B] text-[#69ff00]'
-                    : 'text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5]'
-                }`}
-                title="Keyboard shortcuts"
-                aria-label="Keyboard shortcuts"
-                aria-expanded={isShortcutsOpen}
-              >
-                <Keyboard className="h-4 w-4" />
-              </button>
-
-              {isShortcutsOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Keyboard shortcuts"
-                  className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-[#29292E] bg-[#111113]/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-page-fade"
-                >
-                  <div className="mb-3 flex items-center justify-between border-b border-[#1F1F23] pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Keyboard className="h-3.5 w-3.5 text-[#69ff00]" />
-                      <span className="text-xs font-semibold text-[#F5F5F5]">
-                        Keyboard Shortcuts
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsShortcutsOpen(false)}
-                      className="text-[#71717A] hover:text-[#F5F5F5] cursor-pointer"
-                      aria-label="Close shortcuts"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { keys: 'A–D / 1–4', desc: 'Select answer choice' },
-                      { keys: 'Shift + A–D', desc: 'Cross out / restore choice' },
-                      { keys: '0–9 / - / .', desc: 'Type SPR response' },
-                      { keys: 'Enter', desc: 'Check answer / Next question' },
-                      { keys: '← / →', desc: 'Previous / Next question' },
-                      { keys: 'S', desc: 'Toggle Scratchpad' },
-                      { keys: 'Esc', desc: 'Close open tool or modal' },
-                    ].map((item) => (
-                      <div
-                        key={item.keys}
-                        className="flex items-center justify-between gap-2"
-                      >
-                        <span className="text-[#A1A1AA]">{item.desc}</span>
-                        <kbd className="rounded-md border border-[#29292E] bg-[#18181B] px-1.5 py-0.5 font-mono text-[11px] text-[#F5F5F5]">
-                          {item.keys}
-                        </kbd>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sound Mute / Unmute Toggle Button */}
+            {/* Sound Mute / Unmute Toggle Button (matching TopNav) */}
             <button
               type="button"
               aria-label={
@@ -1035,6 +794,7 @@ export const QuestionSolver: React.FC = () => {
                   ? 'Sound effects: On'
                   : 'Sound effects: Off'
               }
+              onMouseEnter={() => soundEngine.play('hover')}
               onClick={() => {
                 const nextState = !settings.soundEnabled;
                 updateSettings({ soundEnabled: nextState });
@@ -1042,7 +802,7 @@ export const QuestionSolver: React.FC = () => {
                   setTimeout(() => soundEngine.play('click'), 20);
                 }
               }}
-              className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1A1AA] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
             >
               {settings.soundEnabled ? (
                 <Volume2 className="h-4 w-4 text-[#F5F5F5]" />
@@ -1115,44 +875,6 @@ export const QuestionSolver: React.FC = () => {
             onClose={() => setIsScratchpadOpen(false)}
           />
 
-          {/* Frosted Session Paused Overlay */}
-          {isSessionPaused && !isQuestionReadOnly && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Session paused"
-              className="absolute inset-0 z-[28] flex items-center justify-center bg-[#0A0A0B]/80 p-4 backdrop-blur-md animate-page-fade"
-            >
-              <div className="w-full max-w-sm rounded-2xl border border-[#29292E] bg-[#111113] p-6 text-center shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)]">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                  <Pause className="h-5 w-5" />
-                </div>
-                <h2 className="mt-4 font-editorial text-2xl text-[#F5F5F5]">
-                  Session Paused
-                </h2>
-                <p className="mt-1.5 text-xs leading-relaxed text-[#A1A1AA]">
-                  Your stopwatch is paused at{' '}
-                  <span className="font-mono font-medium text-[#F5F5F5]">
-                    {formatDuration(questionTimerMs)}
-                  </span>
-                  . Resume whenever you&apos;re ready to continue working on
-                  this question.
-                </p>
-                <div className="mt-6">
-                  <Button3D
-                    variant="primary"
-                    size="lg"
-                    onClick={handleTogglePause}
-                    className="w-full"
-                  >
-                    <Play className="h-4 w-4 fill-current" />
-                    <span>Resume Practice</span>
-                  </Button3D>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Dedicated Examination Content Container (aligned with header & footer max-w-6xl) */}
           <div
             className={`mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6 lg:py-10 ${
@@ -1160,8 +882,7 @@ export const QuestionSolver: React.FC = () => {
                 ? 'pb-56 lg:pb-64'
                 : ''
             } ${
-              (isScratchpadOpen && isDesktopSmUp) ||
-              (isSessionPaused && !isQuestionReadOnly)
+              isScratchpadOpen && isDesktopSmUp
                 ? 'pointer-events-none select-none'
                 : ''
             }`}
@@ -1196,96 +917,65 @@ export const QuestionSolver: React.FC = () => {
         ) : (
           <div
             key={question.id}
-            ref={splitContainerRef}
-            style={
-              useSplitPassageColumn && isDesktopLgUp
-                ? {
-                    gridTemplateColumns: `${passageSplitRatio}fr auto ${
-                      100 - passageSplitRatio
-                    }fr`,
-                  }
-                : undefined
-            }
-            className={`grid flex-1 gap-8 lg:gap-0 animate-content-in ${
+            className={`grid flex-1 gap-8 lg:gap-12 animate-content-in ${
               useSplitPassageColumn
-                ? 'grid-cols-1 items-start'
+                ? 'grid-cols-1 lg:grid-cols-12 items-start'
                 : 'mx-auto w-full max-w-3xl grid-cols-1'
             }`}
           >
             {/* Left Examination Column: Reading & Writing Passage (when present) */}
             {useSplitPassageColumn && (
-              <>
-                <div
-                  ref={passageScrollRef}
-                  className={`min-w-0 lg:pr-7 ${
-                    (isScratchpadOpen || hasOverlayScratchStrokes) &&
-                    isDesktopSmUp
-                      ? ''
-                      : 'lg:sticky lg:top-20 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto'
-                  }`}
-                >
-                  <div className="mb-4 flex items-center justify-between border-b border-[#1F1F23] pb-2 text-xs text-[#71717A]">
-                    <span>Passage</span>
-                    {currentHighlights.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundEngine.play('clear');
-                          handleUpdateHighlights(currentQuestionId, []);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-red-300 transition-colors cursor-pointer"
-                        title="Remove all highlights from this passage"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Clear highlights</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <HighlightablePassage
-                    html={question.passage}
-                    highlights={currentHighlights}
-                    onChangeHighlights={(next) =>
-                      handleUpdateHighlights(currentQuestionId, next)
-                    }
-                  />
+              <div
+                ref={passageScrollRef}
+                className={`lg:col-span-6 lg:border-r lg:border-[#1F1F23] lg:pr-10 ${
+                  (isScratchpadOpen || hasOverlayScratchStrokes) && isDesktopSmUp
+                    ? ''
+                    : 'lg:sticky lg:top-20 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto'
+                }`}
+              >
+                <div className="mb-4 flex min-h-[2.25rem] items-center justify-between border-b border-[#1F1F23] pb-3 text-xs text-[#A1A1AA]">
+                  <span className="font-medium">Passage</span>
+                  {currentHighlights.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.play('clear');
+                        handleUpdateHighlights(currentQuestionId, []);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-red-300 transition-colors cursor-pointer"
+                      title="Remove all highlights from this passage"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Clear highlights</span>
+                    </button>
+                  )}
                 </div>
 
-                {/* Resizable Vertical Passage / Question Split Handle (Desktop lg+) */}
-                <div
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    setIsResizingPassageSplit(true);
-                  }}
-                  onDoubleClick={() => {
-                    soundEngine.play('click');
-                    setPassageSplitRatio(50);
-                  }}
-                  title="Drag to resize passage width (double-click to reset)"
-                  aria-label="Resize passage and question columns"
-                  className="group relative hidden lg:flex h-full min-h-[340px] w-4 cursor-col-resize items-center justify-center select-none"
-                >
-                  <div className="h-full w-px bg-[#1F1F23] transition-colors group-hover:bg-[#3F3F46]" />
-                  <div className="absolute h-10 w-1 rounded-full bg-[#3F3F46] opacity-0 transition-all group-hover:bg-[#69ff00] group-hover:opacity-100" />
-                </div>
-              </>
+                <HighlightablePassage
+                  html={question.passage}
+                  highlights={currentHighlights}
+                  onChangeHighlights={(next) =>
+                    handleUpdateHighlights(currentQuestionId, next)
+                  }
+                />
+              </div>
             )}
 
             {/* Right Examination Column (or Centered Column for Math): Question Stem, Choices, Feedback */}
             <div
               className={`${
-                useSplitPassageColumn ? 'lg:pl-7' : ''
+                useSplitPassageColumn ? 'lg:col-span-6' : ''
               } space-y-8 min-w-0`}
             >
-              {/* Question Metadata Header (Single-line Mobile Skill + ID/Difficulty; Full Breadcrumb on sm+) */}
+              {/* Question Metadata Header (Baseline-aligned with Left Passage Header) */}
               <div>
-                <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-[#1F1F23] pb-3">
+                <div className="mb-4 flex min-h-[2.25rem] items-center justify-between gap-2 sm:gap-3 border-b border-[#1F1F23] pb-3">
                   <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
                     <span className="flex h-6 min-w-[1.5rem] shrink-0 px-2 items-center justify-center rounded-full bg-[#69ff00] font-mono text-xs font-semibold text-[#0A0A0B]">
                       {currentIdx + 1}
                     </span>
 
-                    <span className="hidden sm:inline font-medium text-[#F5F5F5] shrink-0">
+                    <span className="hidden sm:inline text-[#A1A1AA] shrink-0">
                       {sectionLabel}
                     </span>
 
@@ -1294,8 +984,10 @@ export const QuestionSolver: React.FC = () => {
                         <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
                         <span
                           className={`${
-                            currentMeta?.skillLabel ? 'hidden sm:inline' : 'truncate min-w-0'
-                          } text-[#D4D4D8] sm:shrink-0`}
+                            currentMeta?.skillLabel
+                              ? 'hidden sm:inline text-[#A1A1AA]'
+                              : 'truncate min-w-0 font-medium text-[#F5F5F5]'
+                          } sm:shrink-0`}
                         >
                           {currentMeta.domainLabel}
                         </span>
@@ -1306,7 +998,7 @@ export const QuestionSolver: React.FC = () => {
                       <>
                         <span className="hidden sm:inline text-[#3F3F46] shrink-0">•</span>
                         <span
-                          className="min-w-0 truncate text-[#D4D4D8] sm:text-[#A1A1AA]"
+                          className="min-w-0 truncate font-medium text-[#F5F5F5]"
                           title={currentMeta.skillLabel}
                         >
                           {currentMeta.skillLabel}
@@ -1753,66 +1445,12 @@ export const QuestionSolver: React.FC = () => {
         </div>
       </div>
 
-      {/* Exit Practice Confirmation Modal */}
-      {isExitConfirmOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="exit-session-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-page-fade"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-[#29292E] bg-[#111113] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <h2
-              id="exit-session-title"
-              className="font-editorial text-2xl text-[#F5F5F5]"
-            >
-              Leave practice session?
-            </h2>
-            <p className="mt-2 text-xs leading-relaxed text-[#A1A1AA]">
-              You can complete your session now to view your summary breakdown,
-              or exit directly to the main menu.
-            </p>
-            <div className="mt-6 flex flex-col gap-2.5">
-              <Button3D
-                variant="primary"
-                size="md"
-                onClick={() => setIsExitConfirmOpen(false)}
-                className="w-full"
-              >
-                <span>Continue Practice</span>
-              </Button3D>
-
-              <Button3D
-                variant="secondary"
-                size="md"
-                onClick={handleCompleteSession}
-                className="w-full"
-              >
-                <span>Complete &amp; View Summary</span>
-              </Button3D>
-
-              <Button3D
-                variant="danger"
-                size="md"
-                onClick={() => {
-                  setIsExitConfirmOpen(false);
-                  closeActiveSession();
-                }}
-                className="w-full"
-              >
-                <span>Exit to Main Menu</span>
-              </Button3D>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Bottom Examination Navigation Bar */}
       <footer
         ref={footerRef}
         className="sticky bottom-0 z-30 border-t border-[#1F1F23] bg-[#0A0A0B]/95 backdrop-blur-md"
       >
-        <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 pt-2.5 pb-3.5 sm:gap-2.5 sm:px-6 sm:pt-3 sm:pb-4">
           <Button3D
             variant="secondary"
             size="sm"
@@ -1828,135 +1466,6 @@ export const QuestionSolver: React.FC = () => {
             </span>
           </Button3D>
 
-          {/* Center Question Navigator Popover Trigger */}
-          <div
-            ref={navigatorRef}
-            className="relative flex items-center justify-center"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setIsNavigatorOpen((prev) => {
-                  const next = !prev;
-                  soundEngine.play(next ? 'toggleOpen' : 'toggleClose');
-                  return next;
-                });
-              }}
-              aria-expanded={isNavigatorOpen}
-              aria-label={`Question ${currentIdx + 1} of ${totalQuestions}. Open question navigator`}
-              className="inline-flex h-9 sm:h-10 items-center gap-1.5 rounded-full border border-[#29292E] bg-[#141417] px-3 sm:px-4 text-xs font-medium tabular-nums text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#18181B] transition-colors cursor-pointer"
-            >
-              <span className="hidden md:inline text-[#A1A1AA]">Question</span>
-              <span className="font-mono font-semibold text-[#F5F5F5]">
-                {currentIdx + 1}
-              </span>
-              <span className="text-[#71717A]">of</span>
-              <span className="font-mono text-[#A1A1AA]">{totalQuestions}</span>
-              {isNavigatorOpen ? (
-                <ChevronDown className="h-3.5 w-3.5 text-[#A1A1AA]" />
-              ) : (
-                <ChevronUp className="h-3.5 w-3.5 text-[#A1A1AA]" />
-              )}
-            </button>
-
-            {isNavigatorOpen && (
-              <div
-                role="dialog"
-                aria-label="Question Navigator"
-                className="fixed sm:absolute bottom-16 sm:bottom-13 left-1/2 -translate-x-1/2 z-50 w-[min(368px,calc(100vw-24px))] rounded-2xl border border-[#29292E] bg-[#111113]/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl animate-page-fade"
-              >
-                <div className="mb-3 flex items-center justify-between border-b border-[#1F1F23] pb-2.5">
-                  <div>
-                    <div className="text-xs font-semibold text-[#F5F5F5]">
-                      Question Navigator
-                    </div>
-                    <div className="text-[11px] text-[#71717A] tabular-nums">
-                      {
-                        Object.values(activeSession.questionStates).filter(
-                          (s) => s.isSubmitted
-                        ).length
-                      }{' '}
-                      of {totalQuestions} answered
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsNavigatorOpen(false)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-[#71717A] hover:bg-[#18181B] hover:text-[#F5F5F5] cursor-pointer"
-                    aria-label="Close navigator"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div
-                  ref={navigatorGridRef}
-                  className="grid max-h-60 grid-cols-6 gap-1.5 overflow-y-auto pr-1"
-                >
-                  {activeSession.questionIds.map((qId, idx) => {
-                    const st = activeSession.questionStates[qId];
-                    const isCurrent = idx === currentIdx;
-                    const isSub = Boolean(st?.isSubmitted);
-                    const isCorr = Boolean(st?.isCorrect);
-                    const hasDraft = Boolean(st?.draftAnswer.trim());
-
-                    let tileClass =
-                      'border-[#29292E] bg-[#18181B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]';
-                    if (isCurrent) {
-                      tileClass =
-                        'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B] font-bold';
-                    } else if (isSub && isCorr) {
-                      tileClass =
-                        'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 font-semibold';
-                    } else if (isSub && !isCorr) {
-                      tileClass =
-                        'border-red-500/40 bg-red-500/15 text-red-300 font-semibold';
-                    } else if (hasDraft) {
-                      tileClass =
-                        'border-[#69ff00]/50 bg-[#18181B] text-[#F5F5F5]';
-                    }
-
-                    return (
-                      <button
-                        key={qId}
-                        type="button"
-                        data-nav-current={isCurrent ? 'true' : undefined}
-                        onClick={() => {
-                          soundEngine.play('navigate');
-                          handleNavigateToIndex(idx);
-                        }}
-                        aria-current={isCurrent ? 'step' : undefined}
-                        className={`flex h-9 items-center justify-center rounded-xl border font-mono text-xs tabular-nums transition-colors cursor-pointer ${tileClass}`}
-                      >
-                        {idx + 1}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Compact Navigator Status Legend */}
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#1F1F23] pt-2.5 text-[11px] text-[#A1A1AA]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-[#69ff00]" />
-                    <span>Current</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    <span>Correct</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-red-400" />
-                    <span>Incorrect</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full border border-[#3F3F46] bg-[#18181B]" />
-                    <span>Unanswered</span>
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
             <Button3D
               variant="secondary"
@@ -1964,15 +1473,13 @@ export const QuestionSolver: React.FC = () => {
               className={footerNavBtnClass}
               silentClick
               disabled={currentIdx === 0}
-              title="Previous question (←)"
               onClick={() => {
                 soundEngine.play('navigate');
                 handleNavigateToIndex(currentIdx - 1);
               }}
             >
               <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Previous</span>
-              <span className="sm:hidden">Prev</span>
+              <span>Previous</span>
             </Button3D>
 
             {currentIdx < totalQuestions - 1 ? (
@@ -1983,7 +1490,6 @@ export const QuestionSolver: React.FC = () => {
                 size="sm"
                 className={footerNavBtnClass}
                 silentClick
-                title="Next question (→)"
                 onClick={() => {
                   soundEngine.play('navigate');
                   handleNavigateToIndex(currentIdx + 1);

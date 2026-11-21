@@ -123,37 +123,34 @@ export const SessionSummary: React.FC = () => {
           </div>
         </div>
 
-        {/* Tactile Surface Metric Cards */}
-        <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-4 sm:p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        {/* Clean Typography-Driven Metrics Strip */}
+        <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-[#1F1F23] pt-6">
+          <div>
             <div className="text-xs text-[#71717A]">Answered</div>
-            <div className="mt-1.5 font-editorial text-2xl tabular-nums text-[#F5F5F5]">
+            <div className="mt-1 text-lg font-medium tabular-nums text-[#F5F5F5]">
               {answeredCount}
-              <span className="ml-1 font-sans text-xs font-normal text-[#71717A]">
-                / {displayedQuestionEntries.length}
-              </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-4 sm:p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div>
             <div className="text-xs text-[#71717A]">Correct</div>
-            <div className="mt-1.5 font-editorial text-2xl tabular-nums text-emerald-400">
+            <div className="mt-1 text-lg font-medium tabular-nums text-emerald-400">
               {correctCount}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-4 sm:p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div>
             <div className="text-xs text-[#71717A]">Incorrect</div>
-            <div className="mt-1.5 font-editorial text-2xl tabular-nums text-red-400">
+            <div className="mt-1 text-lg font-medium tabular-nums text-red-400">
               {incorrectCount}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#29292E] bg-[#111113] p-4 sm:p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div>
             <div className="text-xs text-[#71717A]">Time (Avg)</div>
-            <div className="mt-1.5 font-editorial text-2xl tabular-nums text-[#F5F5F5]">
+            <div className="mt-1 text-lg font-medium tabular-nums text-[#F5F5F5]">
               {formatDuration(totalTimeMs)}{' '}
-              <span className="font-sans text-xs font-normal text-[#71717A]">
+              <span className="text-xs font-normal text-[#71717A]">
                 ({formatShortDuration(avgTimeMs)}/q)
               </span>
             </div>
@@ -185,13 +182,13 @@ export const SessionSummary: React.FC = () => {
         </div>
       </div>
 
-      {/* Divided Question Breakdown List */}
+      {/* Simple Divided Question List */}
       <div className="mt-10">
         <h2 className="text-xs font-medium text-[#71717A] mb-3">
           Question Breakdown — Click any item to inspect
         </h2>
 
-        <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113]">
           {displayedQuestionEntries.map(({ qId, idx, st }) => {
             const meta = metaMap.get(qId);
             const diff = getDifficultyBadgeInfo(meta?.difficulty);
@@ -201,12 +198,6 @@ export const SessionSummary: React.FC = () => {
               correctAnsList && correctAnsList.length > 0
                 ? correctAnsList.join(' or ')
                 : null;
-
-            const numberBadgeClass = st?.isSubmitted
-              ? st.isCorrect
-                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                : 'border-red-500/40 bg-red-500/15 text-red-300'
-              : 'border-[#29292E] bg-[#18181B] text-[#71717A]';
 
             return (
               <button
@@ -219,11 +210,9 @@ export const SessionSummary: React.FC = () => {
                 }}
                 className="group flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-[#18181B] transition-colors cursor-pointer first:rounded-t-2xl last:rounded-b-2xl focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-[-2px]"
               >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border font-mono text-xs font-semibold tabular-nums ${numberBadgeClass}`}
-                  >
-                    {idx + 1}
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="font-mono text-xs text-[#71717A] w-6">
+                    {String(idx + 1).padStart(2, '0')}
                   </span>
 
                   <div className="min-w-0">
@@ -233,7 +222,7 @@ export const SessionSummary: React.FC = () => {
                       </span>
                       {meta?.difficulty && (
                         <span
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${diff.className}`}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${diff.className}`}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${diff.dotColor}`}
@@ -252,28 +241,19 @@ export const SessionSummary: React.FC = () => {
                   <div className="text-right text-xs">
                     {st?.isSubmitted ? (
                       st.isCorrect ? (
-                        <span className="font-medium text-emerald-400">
+                        <span className="text-emerald-400">
                           Correct ({st.submittedAnswer})
                         </span>
                       ) : (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 justify-end">
-                          <span className="font-medium text-red-400">
-                            Incorrect ({st.submittedAnswer})
-                          </span>
-                          {correctAnsLabel && (
-                            <span className="text-[#A1A1AA]">
-                              • Correct:{' '}
-                              <strong className="font-mono text-[#F5F5F5]">
-                                {correctAnsLabel}
-                              </strong>
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-red-400">
+                          Incorrect ({st.submittedAnswer}
+                          {correctAnsLabel ? ` → ${correctAnsLabel}` : ''})
+                        </span>
                       )
                     ) : (
                       <span className="text-[#71717A]">Unanswered</span>
                     )}
-                    <div className="mt-0.5 text-xs tabular-nums text-[#71717A]">
+                    <div className="text-xs tabular-nums text-[#71717A]">
                       {formatShortDuration(st?.timeSpent || 0)}
                     </div>
                   </div>
