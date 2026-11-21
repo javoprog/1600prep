@@ -21,6 +21,8 @@ export const SessionSummary: React.FC = () => {
     closeActiveSession,
     triggerWizardReset,
     metaMap,
+    user,
+    openAuthModal,
   } = useApp();
 
   if (!activeSession) return null;
@@ -103,10 +105,31 @@ export const SessionSummary: React.FC = () => {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 animate-completion">
       {/* Editorial Header */}
       <div className="border-b border-[#1F1F23] pb-8">
-        <p className="text-xs font-medium text-[#A1A1AA]">
-          Session completed •{' '}
-          {activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-medium text-[#A1A1AA]">
+            Session completed •{' '}
+            {activeSession.subject === 'rw' ? 'Reading & Writing' : 'Math'}
+          </p>
+
+          {user ? (
+            <button
+              type="button"
+              onClick={() => openAuthModal('results')}
+              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span>Saved to {user.name}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openAuthModal('auth')}
+              className="inline-flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#69ff00] transition-colors cursor-pointer"
+            >
+              <span>Sign in to save results →</span>
+            </button>
+          )}
+        </div>
         <div className="mt-2 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
           <div>
             <h1 className="font-editorial text-2xl sm:text-3xl text-[#F5F5F5] tracking-tight">

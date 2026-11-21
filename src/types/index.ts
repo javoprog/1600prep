@@ -152,3 +152,57 @@ export interface UserSettings {
   defaultDifficulty: DifficultyFilter;
   defaultQuestionCount: number; // 0 = All (continuous), or fixed count (e.g. 5, 10, 20, 30)
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string | null;
+  avatarUrl: string | null;
+  hasPassword: boolean;
+  googleConnected: boolean;
+  googleEmail: string | null;
+  telegramConnected: boolean;
+  telegramId: string | null;
+  telegramUsername: string | null;
+  telegramFirstName: string | null;
+  createdAt: string;
+}
+
+export interface AuthProviderConfig {
+  googleEnabled: boolean;
+  googleClientId: string | null;
+  telegramBotEnabled: boolean;
+  telegramWidgetEnabled: boolean;
+  telegramBotUsername: string | null;
+}
+
+export interface SavedSessionItem {
+  id: string;
+  subject: SubjectCode;
+  mode: PracticeMode;
+  title: string;
+  totalQuestions: number;
+  answeredCount: number;
+  correctCount: number;
+  totalTime: number;
+  startedAt: number;
+  completedAt: number | null;
+}
+
+export interface SavedResultsSummary {
+  totalAttempts: number;
+  correctAttempts: number;
+  accuracyPercent: number;
+  uniqueQuestionsAttempted: number;
+  uniqueQuestionsSolved: number;
+  totalTimeMs: number;
+  bySubject: {
+    rw: { total: number; correct: number; accuracyPercent: number };
+    math: { total: number; correct: number; accuracyPercent: number };
+  };
+  solvedQuestionIds: string[];
+  mistakeQuestionIds: string[];
+  recentSessions: SavedSessionItem[];
+  recentAttempts: Attempt[];
+}
+

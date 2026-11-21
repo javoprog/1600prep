@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Volume2, VolumeX } from 'lucide-react';
+import { User, Volume2, VolumeX } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { soundEngine } from '@/services/sound/soundEngine';
@@ -13,6 +13,9 @@ export const TopNav: React.FC = () => {
   const {
     settings,
     updateSettings,
+    user,
+    savedResults,
+    openAuthModal,
     activeSession,
     isSessionSummaryView,
     closeActiveSession,
@@ -45,8 +48,8 @@ export const TopNav: React.FC = () => {
           <BrandLogo />
         </Link>
 
-        {/* Right Controls: Sound Toggle */}
-        <div className="flex items-center gap-1.5">
+        {/* Right Controls: Sound Toggle + Optional Auth / Saved Results */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label={
@@ -75,6 +78,39 @@ export const TopNav: React.FC = () => {
               <VolumeX className="h-4 w-4 text-[#71717A]" />
             )}
           </button>
+
+          {user ? (
+            <button
+              type="button"
+              onMouseEnter={() => soundEngine.play('hover')}
+              onClick={() => {
+                soundEngine.play('click');
+                openAuthModal('results');
+              }}
+              className="flex h-8 items-center gap-2 rounded-full border border-[#29292E] bg-[#111113] px-3 text-xs font-medium text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#18181B] transition-colors cursor-pointer"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[#69ff00]" />
+              <span className="max-w-[120px] truncate">{user.name}</span>
+              {savedResults && savedResults.totalAttempts > 0 && (
+                <span className="font-mono text-[11px] text-[#A1A1AA]">
+                  {savedResults.accuracyPercent}%
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onMouseEnter={() => soundEngine.play('hover')}
+              onClick={() => {
+                soundEngine.play('click');
+                openAuthModal('auth');
+              }}
+              className="flex h-8 items-center gap-1.5 rounded-full border border-[#29292E] bg-[#111113] px-3 text-xs font-medium text-[#A1A1AA] hover:border-[#3F3F46] hover:bg-[#18181B] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            >
+              <User className="h-3.5 w-3.5" />
+              <span>Sign in</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

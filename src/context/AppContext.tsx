@@ -11,15 +11,18 @@ import React, {
 } from 'react';
 import {
   Attempt,
+  AuthProviderConfig,
   PassageHighlight,
   PracticeFilters,
   PracticeMode,
   Question,
   QuestionMeta,
+  SavedResultsSummary,
   ScratchpadStroke,
   Session,
   SessionQuestionState,
   TaxonomyData,
+  UserProfile,
   UserSettings,
 } from '@/types';
 import {
@@ -36,6 +39,24 @@ import {
   selectQuestionsForSession,
 } from '@/services/questionBank';
 import { soundEngine } from '@/services/sound/soundEngine';
+import {
+  bufferGuestAttempt,
+  bufferGuestSession,
+  clearGuestResultsBuffer,
+  clearResultsOnBackend,
+  fetchAuthConfig,
+  fetchCurrentUser,
+  fetchResultsSummary,
+  getStoredAuthToken,
+  loadGuestResultsBuffer,
+  saveAttemptToBackend,
+  saveSessionToBackend,
+  sessionToSavedSessionItem,
+  setStoredAuthToken,
+  syncGuestResultsToBackend,
+} from '@/services/api/backendApi';
+
+export type AuthModalTab = 'auth' | 'results' | 'account';
 
 interface AppContextValue {
   // Catalog
@@ -51,6 +72,22 @@ interface AppContextValue {
   // User Preferences (stored locally on device)
   settings: UserSettings;
   updateSettings: (partial: Partial<UserSettings>) => void;
+
+  // Optional Authentication & Saved Results
+  user: UserProfile | null;
+  authToken: string | null;
+  isAuthLoading: boolean;
+  authConfig: AuthProviderConfig | null;
+  savedResults: SavedResultsSummary | null;
+  isAuthModalOpen: boolean;
+  authModalTab: AuthModalTab;
+  openAuthModal: (tab?: AuthModalTab) => void;
+  closeAuthModal: () => void;
+  handleAuthSuccess: (token: string, user: UserProfile) => Promise<void>;
+  setUserProfile: (user: UserProfile) => void;
+  refreshUserAndResults: () => Promise<void>;
+  clearSavedResults: () => Promise<void>;
+  logout: () => void;
 
   // Wizard Navigation Reset
   wizardResetToken: number;
@@ -111,6 +148,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const settingsRef = useRef<UserSettings>(DEFAULT_USER_SETTINGS);
 
+  // Optional authentication & saved results state
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const authTokenRef = useRef<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [authConfig, setAuthConfig] = useState<AuthProviderConfig | null>(null);
+  const [savedResults, setSavedResults] =
+    useState<SavedResultsSummary | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalTab, setAuthModalTab] = useState<AuthModalTab>('auth');
+
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [isSessionSummaryView, setIsSessionSummaryView] =
     useState<boolean>(false);
@@ -124,6 +172,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     activeSessionRef.current = activeSession;
   }, [activeSession]);
+
+  useEffect(() => {
+    authTokenRef.current = authToken;
+  }, [authToken]);
+
+  const syncPendingGuestData = useCallback(async (token: string) => {
+    const buffer = loadGuestResultsBuffer();
+    const currentSess = activeSessionRef.current;
+
+    const sessionsToSync = [...buffer.sessions];
+    if (currentSess) {
+      const item = sessionToSavedSessionItem(currentSess);
+      if (
+        item.answeredCount > 0 &&
+        !sessionsToSync.some((s) => s.id === item.id)
+      ) {
+        sessionsToSync.push(item);
+      }
+    }
+
+    if (buffer.attempts.length > 0 || sessionsToSync.length > 0) {
+      try {
+        const summary = await syncGuestResultsToBackend(token, {
+          attempts: buffer.attempts,
+          sessions: sessionsToSync,
+        });
+        clearGuestResultsBuffer();
+        setSavedResults(summary);
+        return;
+      } catch {
+        // Fallback to normal summary fetch
+      }
+    }
+
+    try {
+      const summary = await fetchResultsSummary(token);
+      setSavedResults(summary);
+    } catch {
+      // Ignore if backend is offline
+    }
+  }, []);
+
+  const refreshUserAndResults = useCallback(async () => {
+    const token = authTokenRef.current || getStoredAuthToken();
+    if (!token) return;
+    try {
+      const [profile, summary] = await Promise.all([
+        fetchCurrentUser(token),
+        fetchResultsSummary(token),
+      ]);
+      setUser(profile);
+      setSavedResults(summary);
+    } catch {
+      // Keep existing state if temporary network error
+    }
+  }, []);
+
+  const handleAuthSuccess = useCallback(
+    async (token: string, profile: UserProfile) => {
+      setStoredAuthToken(token);
+      authTokenRef.current = token;
+      setAuthToken(token);
+      setUser(profile);
+      await syncPendingGuestData(token);
+    },
+    [syncPendingGuestData]
+  );
+
+  const setUserProfile = useCallback((profile: UserProfile) => {
+    setUser(profile);
+  }, []);
+
+  const logout = useCallback(() => {
+    setStoredAuthToken(null);
+    authTokenRef.current = null;
+    setAuthToken(null);
+    setUser(null);
+    setSavedResults(null);
+    setIsAuthModalOpen(false);
+  }, []);
+
+  const clearSavedResults = useCallback(async () => {
+    const token = authTokenRef.current;
+    if (!token) return;
+    await clearResultsOnBackend(token);
+    clearGuestResultsBuffer();
+    const summary = await fetchResultsSummary(token);
+    setSavedResults(summary);
+  }, []);
+
+  const openAuthModal = useCallback(
+    (tab?: AuthModalTab) => {
+      if (tab) {
+        setAuthModalTab(tab);
+      } else {
+        setAuthModalTab(user ? 'results' : 'auth');
+      }
+      setIsAuthModalOpen(true);
+    },
+    [user]
+  );
+
+  const closeAuthModal = useCallback(() => {
+    setIsAuthModalOpen(false);
+  }, []);
 
   useEffect(() => {
     const saved = loadUserSettings();
@@ -144,9 +297,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           setIsSessionSummaryView(persisted.isSessionSummaryView);
         }
       }
+
+      // Initialize optional backend auth config & stored session token asynchronously
+      fetchAuthConfig()
+        .then((cfg) => setAuthConfig(cfg))
+        .catch(() => {});
+
+      const storedToken = getStoredAuthToken();
+      if (storedToken) {
+        authTokenRef.current = storedToken;
+        setAuthToken(storedToken);
+        fetchCurrentUser(storedToken)
+          .then(async (profile) => {
+            setUser(profile);
+            await syncPendingGuestData(storedToken);
+          })
+          .catch(() => {
+            setStoredAuthToken(null);
+            authTokenRef.current = null;
+            setAuthToken(null);
+            setUser(null);
+          })
+          .finally(() => {
+            setIsAuthLoading(false);
+          });
+      } else {
+        setIsAuthLoading(false);
+      }
+    } else {
+      setIsAuthLoading(false);
     }
     hasHydratedSessionRef.current = true;
-  }, []);
+  }, [syncPendingGuestData]);
 
   useEffect(() => {
     if (!hasHydratedSessionRef.current) return;
@@ -477,6 +659,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       activeSessionRef.current = updatedSession;
       setActiveSession(updatedSession);
+
+      // Save to backend if authenticated, otherwise buffer locally so a later sign-in syncs it
+      const token = authTokenRef.current;
+      if (token) {
+        saveAttemptToBackend(token, attempt)
+          .then(() => fetchResultsSummary(token))
+          .then((summary) => setSavedResults(summary))
+          .catch(() => {
+            bufferGuestAttempt(attempt);
+          });
+      } else {
+        bufferGuestAttempt(attempt);
+      }
+
       return attempt;
     },
     []
@@ -557,6 +753,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     activeSessionRef.current = completed;
     setActiveSession(completed);
     setIsSessionSummaryView(true);
+
+    // Save completed session to backend if signed in, otherwise buffer for post-session sign-in
+    const token = authTokenRef.current;
+    if (token) {
+      saveSessionToBackend(token, completed)
+        .then(() => fetchResultsSummary(token))
+        .then((summary) => setSavedResults(summary))
+        .catch(() => {
+          bufferGuestSession(completed);
+        });
+    } else {
+      bufferGuestSession(completed);
+    }
   }, []);
 
   const syncSessionTime = useCallback(
@@ -606,6 +815,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      user,
+      authToken,
+      isAuthLoading,
+      authConfig,
+      savedResults,
+      isAuthModalOpen,
+      authModalTab,
+      openAuthModal,
+      closeAuthModal,
+      handleAuthSuccess,
+      setUserProfile,
+      refreshUserAndResults,
+      clearSavedResults,
+      logout,
       wizardResetToken,
       triggerWizardReset,
       activeSession,
@@ -634,6 +857,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       reloadCatalog,
       settings,
       updateSettings,
+      user,
+      authToken,
+      isAuthLoading,
+      authConfig,
+      savedResults,
+      isAuthModalOpen,
+      authModalTab,
+      openAuthModal,
+      closeAuthModal,
+      handleAuthSuccess,
+      setUserProfile,
+      refreshUserAndResults,
+      clearSavedResults,
+      logout,
       wizardResetToken,
       triggerWizardReset,
       activeSession,
