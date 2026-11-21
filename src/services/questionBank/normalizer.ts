@@ -336,6 +336,13 @@ const WORD_NUMBERS: Record<string, number> = {
   eighteen: 18,
   nineteen: 19,
   twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
 };
 
 const WORD_DENOMINATORS: Record<string, number> = {
@@ -359,29 +366,85 @@ const WORD_DENOMINATORS: Record<string, number> = {
   ninths: 9,
   tenth: 10,
   tenths: 10,
+  eleventh: 11,
+  elevenths: 11,
+  twelfth: 12,
+  twelfths: 12,
 };
 
-function parseSpokenFraction(text: string): string[] {
-  const cleaned = text.toLowerCase().trim();
-  const isNegative = cleaned.startsWith('negative ') || cleaned.startsWith('minus ');
-  const body = cleaned.replace(/^(negative|minus)\s+/, '');
+function parseWordOrDigitNumber(token: string): number | undefined {
+  const cleaned = stripThousandsCommas(token.trim().toLowerCase());
+  if (/^\d+$/.test(cleaned)) {
+    return Number(cleaned);
+  }
+  if (WORD_NUMBERS[cleaned] !== undefined) {
+    return WORD_NUMBERS[cleaned];
+  }
+  const parts = cleaned.split(/[\s-]+/).filter(Boolean);
+  if (parts.length === 2) {
+    const tens = WORD_NUMBERS[parts[0]];
+    const ones = WORD_NUMBERS[parts[1]];
+    if (tens !== undefined && tens >= 20 && ones !== undefined && ones < 10) {
+      return tens + ones;
+    }
+  }
+  return undefined;
+}
 
-  // e.g. "7 over 6" or "three over four"
-  const overMatch = body.match(/^(\d+|[a-z]+)\s+over\s+(\d+|[a-z]+)$/);
-  if (overMatch) {
-    const num = /^\d+$/.test(overMatch[1]) ? Number(overMatch[1]) : WORD_NUMBERS[overMatch[1]];
-    const den = /^\d+$/.test(overMatch[2]) ? Number(overMatch[2]) : WORD_NUMBERS[overMatch[2]];
+function parseSpokenFraction(text: string): string[] {
+  let body = text
+    .toLowerCase()
+    .trim()
+    .replace(/[.,;]+$/, '')
+    .replace(/\s+end\s+fraction$/i, '')
+    .trim();
+
+  let isNegative = false;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    if (/^(?:the\s+)?(?:negative|minus)(?:\s+of)?\s+/.test(body)) {
+      isNegative = true;
+      body = body.replace(/^(?:the\s+)?(?:negative|minus)(?:\s+of)?\s+/, '');
+      changed = true;
+    }
+    if (/^(?:the\s+)?fraction(?:\s+with)?\s+/.test(body)) {
+      body = body.replace(/^(?:the\s+)?fraction(?:\s+with)?\s+/, '');
+      changed = true;
+    }
+  }
+
+  // e.g. "numerator 7 and denominator 6"
+  const numDenMatch = body.match(
+    /^(?:the\s+)?numerator\s+(.+?)\s*,?\s+and\s+denominator\s+(.+)$/
+  );
+  if (numDenMatch) {
+    const num = parseWordOrDigitNumber(numDenMatch[1]);
+    const den = parseWordOrDigitNumber(numDenMatch[2]);
     if (num !== undefined && den) {
       const sign = isNegative ? '-' : '';
       return [`${sign}${num}/${den}`];
     }
   }
 
-  // e.g. "three halves", "one half", "four fifths"
-  const parts = body.split(/[\s-]+/);
-  if (parts.length === 2) {
-    const num = /^\d+$/.test(parts[0]) ? Number(parts[0]) : WORD_NUMBERS[parts[0]];
-    const den = WORD_DENOMINATORS[parts[1]];
+  // e.g. "7 over 6" or "three over four" or "twenty-one over four"
+  const overMatch = body.match(/^(.+?)\s+over\s+(.+)$/);
+  if (overMatch) {
+    const num = parseWordOrDigitNumber(overMatch[1]);
+    const den = parseWordOrDigitNumber(overMatch[2]);
+    if (num !== undefined && den) {
+      const sign = isNegative ? '-' : '';
+      return [`${sign}${num}/${den}`];
+    }
+  }
+
+  // e.g. "three halves", "one half", "four fifths", "twenty-one fourths"
+  const parts = body.split(/[\s-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const denWord = parts[parts.length - 1];
+    const numPhrase = parts.slice(0, -1).join('-');
+    const num = parseWordOrDigitNumber(numPhrase);
+    const den = WORD_DENOMINATORS[denWord];
     if (num !== undefined && den) {
       const sign = isNegative ? '-' : '';
       const frac = `${sign}${num}/${den}`;
@@ -435,8 +498,11 @@ export function extractDisclosedSprAnswers(rationaleHtml?: string): string[] {
         const inner = bm.slice(1, -1);
         const parsedFracs = parseSpokenFraction(inner);
         parsedFracs.forEach((f) => results.add(f));
+        const looksLikeSpokenFraction = /\b(?:over|fraction|numerator|denominator|halves|thirds|fourths|quarters|fifths|sixths|sevenths|eighths|ninths|tenths|elevenths|twelfths)\b/i.test(
+          inner
+        );
         const numTokens = stripThousandsCommas(inner).match(/-?\d+(?:\/\d+|\.\d+)?/g);
-        if (numTokens && parsedFracs.length === 0) {
+        if (numTokens && parsedFracs.length === 0 && !looksLikeSpokenFraction) {
           numTokens.forEach((t) => results.add(t));
         }
       }
@@ -556,6 +622,11 @@ export function evaluateAnswer(
   const userVal = parseNumericValue(cleanedUser);
   if (userVal === null) return false;
 
+  const unsignedUser = cleanedUser.replace(/^-/, '');
+  const dotIdx = unsignedUser.indexOf('.');
+  const decimalPart = dotIdx >= 0 ? unsignedUser.slice(dotIdx + 1) : '';
+  const decimalDigits = decimalPart.length;
+
   for (const key of question.correctAnswer) {
     const keyVal = parseNumericValue(key);
     if (keyVal === null) continue;
@@ -565,10 +636,29 @@ export function evaluateAnswer(
       return true;
     }
 
-    // SAT 4-character rounding/truncation tolerance for repeating decimals (e.g., 3/17 -> 0.176 or .1764 or .1765)
-    const decimalPart = cleanedUser.split('.')[1];
-    if (decimalPart && decimalPart.length >= 3 && Math.abs(userVal - keyVal) <= 0.0006) {
-      return true;
+    // SAT 5-character (6 for negative) decimal rounding or truncation rule:
+    // For |val| < 1: must enter at least 3 decimal digits (e.g., 0.666, 0.667, .6666, .6667)
+    // For |val| >= 1: must fill the 5-character box (e.g., 16.66, 16.67, 6.666, 6.667, 133.3)
+    if (decimalDigits > 0 && userVal * keyVal >= 0) {
+      const fillsBox =
+        Math.abs(keyVal) < 1
+          ? decimalDigits >= 3
+          : unsignedUser.length >= 5 && decimalDigits >= 1;
+
+      if (fillsBox) {
+        const factor = Math.pow(10, decimalDigits);
+        const truncatedKey = Math.trunc(keyVal * factor) / factor;
+        const roundedKey = Math.round(keyVal * factor) / factor;
+        const ulp = 1 / factor;
+
+        if (
+          Math.abs(userVal - truncatedKey) < 1e-9 ||
+          Math.abs(userVal - roundedKey) < 1e-9 ||
+          Math.abs(userVal - keyVal) <= ulp + 1e-9
+        ) {
+          return true;
+        }
+      }
     }
   }
 

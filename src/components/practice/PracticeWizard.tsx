@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  Minus,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
@@ -19,6 +20,14 @@ import { Button3D } from '@/components/ui/Button3D';
 import { soundEngine } from '@/services/sound/soundEngine';
 
 type WizardStep = 1 | 2;
+
+const SESSION_LENGTH_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 5, label: '5' },
+  { value: 10, label: '10' },
+  { value: 20, label: '20' },
+  { value: 30, label: '30' },
+  { value: 0, label: 'All' },
+];
 
 const DIFFICULTY_OPTIONS: Array<{
   id: DifficultyCode;
@@ -36,7 +45,7 @@ const DIFFICULTY_OPTIONS: Array<{
     id: 'M',
     label: 'Medium',
     description: 'Standard Digital SAT exam complexity',
-    dotColor: 'bg-[#F5F5F5]',
+    dotColor: 'bg-amber-400',
   },
   {
     id: 'H',
@@ -65,7 +74,14 @@ export function formatDifficultySelectionLabel(
 }
 
 export const PracticeWizard: React.FC = () => {
-  const { metas, taxonomy, startPracticeSession, wizardResetToken } = useApp();
+  const {
+    metas,
+    taxonomy,
+    startPracticeSession,
+    wizardResetToken,
+    settings,
+    updateSettings,
+  } = useApp();
 
   const [step, setStep] = useState<WizardStep>(1);
   const [stepDirection, setStepDirection] = useState<'none' | 'forward' | 'backward'>('none');
@@ -99,6 +115,16 @@ export const PracticeWizard: React.FC = () => {
   const [selectedDifficulties, setSelectedDifficulties] = useState<
     DifficultyCode[]
   >(['E', 'M', 'H']);
+  const [questionCountLimit, setQuestionCountLimit] = useState<number>(
+    settings.defaultQuestionCount || 0
+  );
+
+  useEffect(() => {
+    const valid = SESSION_LENGTH_OPTIONS.some(
+      (opt) => opt.value === settings.defaultQuestionCount
+    );
+    setQuestionCountLimit(valid ? settings.defaultQuestionCount : 0);
+  }, [settings.defaultQuestionCount]);
 
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -165,6 +191,47 @@ export const PracticeWizard: React.FC = () => {
     ).length;
   }, [selectedSkills.length, selectedDifficulties, skillMatchingMetas]);
 
+  const allSelectableSkillCodes = useMemo(() => {
+    const codes: string[] = [];
+    for (const dom of currentSubjectDomains) {
+      for (const sk of dom.skills) {
+        if (sk.questionCount > 0) {
+          codes.push(sk.code);
+        }
+      }
+    }
+    return codes;
+  }, [currentSubjectDomains]);
+
+  const isAllSubjectSkillsSelected =
+    allSelectableSkillCodes.length > 0 &&
+    allSelectableSkillCodes.every((code) => selectedSkills.includes(code));
+
+  const handleToggleAllSubjectSkills = () => {
+    setStartError(null);
+    if (isAllSubjectSkillsSelected) {
+      soundEngine.play('deselect');
+      setSelectedDomains([]);
+      setSelectedSkills([]);
+    } else {
+      soundEngine.play('select');
+      setSelectedDomains(
+        currentSubjectDomains
+          .filter((d) => d.skills.some((s) => s.questionCount > 0))
+          .map((d) => d.primaryClassCd)
+      );
+      setSelectedSkills(allSelectableSkillCodes);
+    }
+  };
+
+  const effectiveSessionCount = useMemo(() => {
+    if (maxAvailableQuestions === 0) return 0;
+    if (questionCountLimit > 0) {
+      return Math.min(questionCountLimit, maxAvailableQuestions);
+    }
+    return maxAvailableQuestions;
+  }, [maxAvailableQuestions, questionCountLimit]);
+
   const currentFilters: PracticeFilters = useMemo(
     () => ({
       subject,
@@ -173,8 +240,15 @@ export const PracticeWizard: React.FC = () => {
       difficulties: selectedDifficulties,
       difficulty:
         selectedDifficulties.length === 1 ? selectedDifficulties[0] : 'ALL',
+      questionCount: questionCountLimit > 0 ? questionCountLimit : undefined,
     }),
-    [subject, selectedDomains, selectedSkills, selectedDifficulties]
+    [
+      subject,
+      selectedDomains,
+      selectedSkills,
+      selectedDifficulties,
+      questionCountLimit,
+    ]
   );
 
   const toggleDomain = (domainCode: string) => {
@@ -183,7 +257,7 @@ export const PracticeWizard: React.FC = () => {
       (d) => d.primaryClassCd === domainCode
     );
     const domainSkillCodes = domainObj
-      ? domainObj.skills.map((s) => s.code)
+      ? domainObj.skills.filter((s) => s.questionCount > 0).map((s) => s.code)
       : [];
 
     const allSkillsInDomainSelected =
@@ -497,20 +571,69 @@ export const PracticeWizard: React.FC = () => {
 
           {/* Domains & Skills Selection */}
           <div className="divide-y divide-[#1F1F23] rounded-2xl border border-[#29292E] bg-[#111113]">
+            <div className="flex items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
+              <div className="text-xs text-[#A1A1AA]">
+                <span className="font-medium text-[#F5F5F5]">
+                  Domains &amp; Skills
+                </span>{' '}
+                <span className="text-[#71717A] tabular-nums">
+                  ({selectedSkills.length} of {allSelectableSkillCodes.length}{' '}
+                  selected)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedSkills.length > 0 && !isAllSubjectSkillsSelected && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.play('deselect');
+                      setSelectedDomains([]);
+                      setSelectedSkills([]);
+                      setStartError(null);
+                    }}
+                    className="rounded-full border border-[#29292E] bg-[#18181B] px-3 py-1 text-xs font-medium text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleToggleAllSubjectSkills}
+                  className="rounded-full border border-[#29292E] bg-[#18181B] px-3 py-1 text-xs font-medium text-[#F5F5F5] hover:border-[#3F3F46] hover:bg-[#202024] transition-colors cursor-pointer"
+                >
+                  {isAllSubjectSkillsSelected ? 'Clear All' : 'Select All'}
+                </button>
+              </div>
+            </div>
+
             {currentSubjectDomains.map((dom) => {
-              const activeSkillsInDom = dom.skills.filter((s) =>
+              const selectableDomSkills = dom.skills.filter(
+                (s) => s.questionCount > 0
+              );
+              const activeSkillsInDom = selectableDomSkills.filter((s) =>
                 selectedSkills.includes(s.code)
               );
               const isAllDomSkillsSelected =
-                dom.skills.length > 0 &&
-                activeSkillsInDom.length === dom.skills.length;
+                selectableDomSkills.length > 0 &&
+                activeSkillsInDom.length === selectableDomSkills.length;
               const isSomeDomSkillsSelected = activeSkillsInDom.length > 0;
+              const isPartiallySelected =
+                isSomeDomSkillsSelected && !isAllDomSkillsSelected;
 
               return (
                 <div key={dom.primaryClassCd} className="p-5 sm:p-6">
                   <button
                     type="button"
-                    aria-pressed={isAllDomSkillsSelected}
+                    role="checkbox"
+                    aria-checked={
+                      isAllDomSkillsSelected
+                        ? true
+                        : isPartiallySelected
+                        ? 'mixed'
+                        : false
+                    }
                     onClick={() => toggleDomain(dom.primaryClassCd)}
                     className="flex w-full items-start justify-between gap-4 rounded-xl text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-[#69ff00] focus-visible:outline-offset-4"
                   >
@@ -519,14 +642,16 @@ export const PracticeWizard: React.FC = () => {
                         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
                           isAllDomSkillsSelected
                             ? 'border-[#69ff00] bg-[#69ff00] text-[#0A0A0B]'
-                            : isSomeDomSkillsSelected
+                            : isPartiallySelected
                             ? 'border-[#69ff00] bg-[#18181B] text-[#69ff00]'
                             : 'border-[#3F3F46] bg-[#18181B]'
                         }`}
                       >
-                        {isSomeDomSkillsSelected && (
+                        {isAllDomSkillsSelected ? (
                           <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                        )}
+                        ) : isPartiallySelected ? (
+                          <Minus className="h-3.5 w-3.5 stroke-[2.5]" />
+                        ) : null}
                       </div>
                       <div>
                         <div className="text-base font-medium text-[#F5F5F5]">
@@ -542,19 +667,23 @@ export const PracticeWizard: React.FC = () => {
                   <div className="mt-4 ml-8 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {dom.skills.map((sk) => {
                       const isSkSelected = selectedSkills.includes(sk.code);
+                      const isZeroCount = sk.questionCount === 0;
                       return (
                         <button
                           key={sk.id}
                           type="button"
+                          disabled={isZeroCount}
                           title={sk.text}
                           aria-pressed={isSkSelected}
                           onClick={() =>
                             toggleSkill(sk.code, dom.primaryClassCd)
                           }
-                          className={`flex items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-xs transition-colors cursor-pointer ${
-                            isSkSelected
-                              ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5]'
-                              : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5]'
+                          className={`flex items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-xs transition-colors ${
+                            isZeroCount
+                              ? 'border-[#1F1F23] bg-[#0A0A0B]/60 text-[#52525B] cursor-not-allowed'
+                              : isSkSelected
+                              ? 'border-[#69ff00]/75 bg-[#18181B] text-[#F5F5F5] cursor-pointer'
+                              : 'border-[#29292E] bg-[#0A0A0B] text-[#A1A1AA] hover:border-[#3F3F46] hover:text-[#F5F5F5] cursor-pointer'
                           }`}
                         >
                           <span className="line-clamp-1">{sk.text}</span>
@@ -646,6 +775,47 @@ export const PracticeWizard: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Session Length Selector */}
+            <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#1F1F23] pt-4">
+              <div>
+                <div className="text-xs font-medium text-[#F5F5F5]">
+                  Session Length
+                </div>
+                <div className="text-xs text-[#71717A]">
+                  Choose a fixed number of questions or practice all matching items
+                </div>
+              </div>
+
+              <div
+                role="group"
+                aria-label="Session question count"
+                className="inline-flex items-center gap-1 self-start sm:self-auto rounded-full border border-[#29292E] bg-[#0A0A0B] p-1"
+              >
+                {SESSION_LENGTH_OPTIONS.map((opt) => {
+                  const isActive = questionCountLimit === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => {
+                        soundEngine.play('select');
+                        setQuestionCountLimit(opt.value);
+                        updateSettings({ defaultQuestionCount: opt.value });
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-medium tabular-nums transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-[#69ff00] text-[#0A0A0B] font-semibold'
+                          : 'text-[#A1A1AA] hover:text-[#F5F5F5]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Inline Warning when skills + difficulties selected but 0 matching questions */}
@@ -685,6 +855,15 @@ export const PracticeWizard: React.FC = () => {
               <span className="text-xs text-[#71717A]">
                 {!hasValidSelection ? (
                   'Select at least 1 skill and 1 difficulty to begin'
+                ) : questionCountLimit > 0 &&
+                  questionCountLimit < maxAvailableQuestions ? (
+                  <span>
+                    <strong className="font-semibold tabular-nums text-[#F5F5F5]">
+                      {effectiveSessionCount.toLocaleString()}
+                    </strong>{' '}
+                    of {maxAvailableQuestions.toLocaleString()} matching
+                    questions ready
+                  </span>
                 ) : (
                   <span>
                     <strong className="font-semibold tabular-nums text-[#F5F5F5]">

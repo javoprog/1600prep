@@ -1,14 +1,20 @@
-import { DifficultyCode, UserSettings } from '@/types';
+import { DifficultyCode, Session, UserSettings } from '@/types';
 
 const SETTINGS_KEY = '1600prep_settings_v1';
+const ACTIVE_SESSION_KEY = '1600prep_active_session_v1';
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   soundEnabled: true,
   soundVolume: 1.0,
   defaultDifficulties: ['E', 'M', 'H'],
   defaultDifficulty: 'ALL',
-  defaultQuestionCount: 10,
+  defaultQuestionCount: 0,
 };
+
+export interface PersistedActiveSessionState {
+  session: Session;
+  isSessionSummaryView: boolean;
+}
 
 export function loadUserSettings(): UserSettings {
   if (typeof window === 'undefined') return DEFAULT_USER_SETTINGS;
@@ -49,7 +55,8 @@ export function loadUserSettings(): UserSettings {
       defaultDifficulty:
         parsed.defaultDifficulty || DEFAULT_USER_SETTINGS.defaultDifficulty,
       defaultQuestionCount:
-        typeof parsed.defaultQuestionCount === 'number'
+        typeof parsed.defaultQuestionCount === 'number' &&
+        parsed.defaultQuestionCount >= 0
           ? parsed.defaultQuestionCount
           : DEFAULT_USER_SETTINGS.defaultQuestionCount,
     };
@@ -64,5 +71,44 @@ export function saveUserSettings(settings: UserSettings): void {
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch (err) {
     console.warn('Failed to save settings to localStorage:', err);
+  }
+}
+
+export function loadPersistedActiveSession(): PersistedActiveSessionState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedActiveSessionState;
+    if (
+      !parsed ||
+      !parsed.session ||
+      typeof parsed.session.id !== 'string' ||
+      !Array.isArray(parsed.session.questionIds) ||
+      parsed.session.questionIds.length === 0
+    ) {
+      return null;
+    }
+    return {
+      session: parsed.session,
+      isSessionSummaryView: Boolean(parsed.isSessionSummaryView),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function savePersistedActiveSession(
+  state: PersistedActiveSessionState | null
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!state) {
+      window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+    } else {
+      window.sessionStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(state));
+    }
+  } catch (err) {
+    console.warn('Failed to persist active session to sessionStorage:', err);
   }
 }

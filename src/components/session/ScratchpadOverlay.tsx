@@ -449,6 +449,27 @@ export const ScratchpadOverlay: React.FC<ScratchpadOverlayProps> = ({
     };
   }, [isDraggingToolbar]);
 
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') return;
+    const clampToolbarOnResize = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = toolbarRef.current?.getBoundingClientRect();
+      const halfW = (rect?.width || 520) / 2;
+      const maxOffsetX = Math.max(24, vw / 2 - halfW - 12);
+      const minOffsetY = -(vh - 168);
+      const maxOffsetY = 12;
+      setToolbarOffset((prev) => {
+        const nextX = Math.max(-maxOffsetX, Math.min(maxOffsetX, prev.x));
+        const nextY = Math.max(minOffsetY, Math.min(maxOffsetY, prev.y));
+        if (nextX === prev.x && nextY === prev.y) return prev;
+        return { x: nextX, y: nextY };
+      });
+    };
+    window.addEventListener('resize', clampToolbarOnResize);
+    return () => window.removeEventListener('resize', clampToolbarOnResize);
+  }, [isOpen]);
+
   // Scratch Board left-edge width resize
   const handleStartBoardResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();

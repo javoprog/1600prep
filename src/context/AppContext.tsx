@@ -24,7 +24,9 @@ import {
 } from '@/types';
 import {
   DEFAULT_USER_SETTINGS,
+  loadPersistedActiveSession,
   loadUserSettings,
+  savePersistedActiveSession,
   saveUserSettings,
 } from '@/services/storage/preferences';
 import {
@@ -115,6 +117,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [wizardResetToken, setWizardResetToken] = useState<number>(0);
   const activeSessionRef = useRef<Session | null>(null);
   const handledSharedQuestionRef = useRef<string | null>(null);
+  const hasHydratedSessionRef = useRef<boolean>(false);
+  const [isPendingSharedQuestion, setIsPendingSharedQuestion] =
+    useState<boolean>(false);
 
   useEffect(() => {
     activeSessionRef.current = activeSession;
@@ -125,7 +130,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     settingsRef.current = saved;
     soundEngine.setSettings(saved);
     setSettings(saved);
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const sharedQId = params.get('question')?.trim();
+      if (sharedQId) {
+        setIsPendingSharedQuestion(true);
+      } else {
+        const persisted = loadPersistedActiveSession();
+        if (persisted) {
+          activeSessionRef.current = persisted.session;
+          setActiveSession(persisted.session);
+          setIsSessionSummaryView(persisted.isSessionSummaryView);
+        }
+      }
+    }
+    hasHydratedSessionRef.current = true;
   }, []);
+
+  useEffect(() => {
+    if (!hasHydratedSessionRef.current) return;
+    if (!activeSession) {
+      savePersistedActiveSession(null);
+    } else {
+      savePersistedActiveSession({
+        session: activeSession,
+        isSessionSummaryView,
+      });
+    }
+  }, [activeSession, isSessionSummaryView]);
 
   const metaMap = useMemo(() => {
     return new Map(metas.map((m) => [m.id, m]));
@@ -223,6 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         isPaused: false,
       };
 
+      activeSessionRef.current = newSession;
       setActiveSession(newSession);
       setIsSessionSummaryView(false);
 
@@ -236,16 +270,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Automatically open a shared question link (?question=<id>) inside our app
   useEffect(() => {
-    if (typeof window === 'undefined' || metas.length === 0) return;
+    if (typeof window === 'undefined') return;
+    if (catalogError) {
+      setIsPendingSharedQuestion(false);
+      return;
+    }
+    if (metas.length === 0) return;
 
     const params = new URLSearchParams(window.location.search);
     const sharedQId = params.get('question')?.trim();
-    if (!sharedQId || handledSharedQuestionRef.current === sharedQId) return;
+    if (!sharedQId || handledSharedQuestionRef.current === sharedQId) {
+      setIsPendingSharedQuestion(false);
+      return;
+    }
 
     handledSharedQuestionRef.current = sharedQId;
+    const lowId = sharedQId.toLowerCase();
 
     const targetMeta = metas.find(
-      (m) => m.id.toLowerCase() === sharedQId.toLowerCase()
+      (m) =>
+        m.id.toLowerCase() === lowId ||
+        m.questionId.toLowerCase() === lowId ||
+        m.uId.toLowerCase() === lowId ||
+        (m.externalId && m.externalId.toLowerCase() === lowId) ||
+        (m.ibn && m.ibn.toLowerCase() === lowId)
     );
     const resolvedId = targetMeta ? targetMeta.id : sharedQId;
     const subject = targetMeta?.subject || 'math';
@@ -276,12 +324,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       'custom',
       title,
       [resolvedId, ...relatedIds]
-    ).catch(() => {});
-  }, [metas, startPracticeSession]);
+    )
+      .catch(() => {})
+      .finally(() => {
+        setIsPendingSharedQuestion(false);
+      });
+  }, [metas, catalogError, startPracticeSession]);
 
   const closeActiveSession = useCallback(() => {
+    activeSessionRef.current = null;
     setActiveSession(null);
     setIsSessionSummaryView(false);
+    savePersistedActiveSession(null);
     if (typeof window !== 'undefined' && window.location.search) {
       const url = new URL(window.location.href);
       if (url.searchParams.has('question')) {
@@ -299,20 +353,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const togglePauseSession = useCallback(() => {
     setActiveSession((prev) => {
       if (!prev || prev.completedAt) return prev;
-      return {
+      const next: Session = {
         ...prev,
         isPaused: !prev.isPaused,
       };
+      activeSessionRef.current = next;
+      return next;
     });
   }, []);
 
   const setDraftAnswer = useCallback((questionId: string, draft: string) => {
     setActiveSession((prev) => {
-      if (!prev) return prev;
+      if (!prev || prev.completedAt) return prev;
       const qState = prev.questionStates[questionId];
       if (!qState || qState.isSubmitted) return prev;
 
-      return {
+      const next: Session = {
         ...prev,
         questionStates: {
           ...prev.questionStates,
@@ -322,6 +378,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           },
         },
       };
+      activeSessionRef.current = next;
+      return next;
     });
   }, []);
 
@@ -376,7 +434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const submitAnswer = useCallback(
     async (question: Question): Promise<Attempt | null> => {
       const currentSess = activeSessionRef.current;
-      if (!currentSess) return null;
+      if (!currentSess || currentSess.completedAt) return null;
 
       const qState = currentSess.questionStates[question.id];
       if (!qState || qState.isSubmitted) return null;
@@ -416,6 +474,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       };
 
+      activeSessionRef.current = updatedSession;
       setActiveSession(updatedSession);
       return attempt;
     },
@@ -443,12 +502,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       // Prefetch upcoming questions
       prefetchQuestions(prev.questionIds.slice(clamped, clamped + 4));
 
-      return {
+      const next: Session = {
         ...prev,
         currentIndex: clamped,
         maxVisitedIndex: Math.max(prev.maxVisitedIndex ?? prev.currentIndex, clamped),
         questionStates: nextStates,
       };
+      activeSessionRef.current = next;
+      return next;
     });
   }, []);
 
@@ -458,12 +519,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     soundEngine.play('complete');
 
+    const maxVisitedIdx = Math.max(
+      currentSess.currentIndex,
+      currentSess.maxVisitedIndex ?? 0
+    );
+
+    const activeQuestionIds = currentSess.questionIds.filter((qId, idx) => {
+      const st = currentSess.questionStates[qId];
+      return (
+        idx === 0 ||
+        idx <= maxVisitedIdx ||
+        Boolean(st?.visited) ||
+        Boolean(st?.isSubmitted) ||
+        Boolean(st?.draftAnswer)
+      );
+    });
+
+    const trimmedIds =
+      activeQuestionIds.length > 0
+        ? activeQuestionIds
+        : currentSess.questionIds.slice(0, 1);
+    const clampedIdx = Math.min(
+      currentSess.currentIndex,
+      Math.max(0, trimmedIds.length - 1)
+    );
+
     const completed: Session = {
       ...currentSess,
+      questionIds: trimmedIds,
+      currentIndex: clampedIdx,
+      maxVisitedIndex: trimmedIds.length - 1,
       completedAt: currentSess.completedAt || Date.now(),
       isPaused: true,
     };
 
+    activeSessionRef.current = completed;
     setActiveSession(completed);
     setIsSessionSummaryView(true);
   }, []);
@@ -485,11 +575,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           };
         }
 
-        return {
+        const next: Session = {
           ...prev,
           totalTime: prev.totalTime + totalDeltaMs,
           questionStates: nextStates,
         };
+        activeSessionRef.current = next;
+        return next;
       });
     },
     []
@@ -499,12 +591,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setWizardResetToken((prev) => prev + 1);
   }, []);
 
+  const effectiveIsCatalogLoading = isCatalogLoading || isPendingSharedQuestion;
+
   const value = useMemo<AppContextValue>(
     () => ({
       taxonomy,
       metas,
       metaMap,
-      isCatalogLoading,
+      isCatalogLoading: effectiveIsCatalogLoading,
       catalogError,
       isOfflineFallback,
       offlineWarning,
@@ -532,7 +626,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       taxonomy,
       metas,
       metaMap,
-      isCatalogLoading,
+      effectiveIsCatalogLoading,
       catalogError,
       isOfflineFallback,
       offlineWarning,

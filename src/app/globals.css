@@ -567,10 +567,14 @@ body {
   border: 1px solid #D4D4D8;
   margin: 0.9rem auto;
   display: block;
-  min-width: min(320px, 100%);
   max-width: min(460px, 100%);
   width: auto;
   height: auto;
+}
+
+.sat-rich-content:not(.sat-rich-option) img.sat-diagram-img,
+.sat-rich-content:not(.sat-rich-option) img:not(.math-img) {
+  min-width: min(260px, 100%);
 }
 
 /* Inline math PNGs in legacy disclosed (IBN) fallback cases */

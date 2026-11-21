@@ -10,9 +10,6 @@ const DB_VERSION = 1;
 export const STORES = {
   QUESTIONS_META: 'questions_meta',
   QUESTIONS_FULL: 'questions_full',
-  ATTEMPTS: 'attempts',
-  SESSIONS: 'sessions',
-  BOOKMARKS: 'bookmarks',
   KV: 'kv_store',
 } as const;
 
@@ -40,23 +37,6 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORES.QUESTIONS_FULL)) {
         const fullStore = db.createObjectStore(STORES.QUESTIONS_FULL, { keyPath: 'id' });
         fullStore.createIndex('subject', 'subject', { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains(STORES.ATTEMPTS)) {
-        const attemptStore = db.createObjectStore(STORES.ATTEMPTS, { keyPath: 'id' });
-        attemptStore.createIndex('questionId', 'questionId', { unique: false });
-        attemptStore.createIndex('sessionId', 'sessionId', { unique: false });
-        attemptStore.createIndex('timestamp', 'timestamp', { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains(STORES.SESSIONS)) {
-        const sessionStore = db.createObjectStore(STORES.SESSIONS, { keyPath: 'id' });
-        sessionStore.createIndex('startedAt', 'startedAt', { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains(STORES.BOOKMARKS)) {
-        const bookmarkStore = db.createObjectStore(STORES.BOOKMARKS, { keyPath: 'questionId' });
-        bookmarkStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
 
       if (!db.objectStoreNames.contains(STORES.KV)) {

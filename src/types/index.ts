@@ -28,15 +28,6 @@ export type DifficultyFilter = DifficultyCode | 'ALL';
 
 export type QuestionType = 'mcq' | 'spr';
 
-export type RepetitionFilter =
-  | 'all'
-  | 'new'
-  | 'previous'
-  | 'incorrect'
-  | 'bookmarked';
-
-export type NewPreviousRatio = 100 | 75 | 50 | 25 | 0;
-
 export type PracticeMode =
   | 'custom'
   | 'mistakes'
@@ -120,9 +111,7 @@ export interface PracticeFilters {
   skills: string[]; // skill_cd list
   difficulties?: DifficultyCode[]; // multi-select difficulties ('E' | 'M' | 'H')
   difficulty?: DifficultyFilter;
-  questionCount?: number;
-  repetitionFilter?: RepetitionFilter;
-  newRatio?: NewPreviousRatio;
+  questionCount?: number; // 0 or undefined = All matching questions
 }
 
 export interface SessionQuestionState {
@@ -155,21 +144,10 @@ export interface Session {
   isPaused: boolean;
 }
 
-export interface Bookmark {
-  questionId: string;
-  createdAt: number;
-  subject?: SubjectCode;
-  domain?: string;
-  skill?: string;
-  difficulty?: DifficultyCode | null;
-}
-
 export interface UserSettings {
   soundEnabled: boolean;
   soundVolume: number; // 0 to 1
   defaultDifficulties: DifficultyCode[];
   defaultDifficulty: DifficultyFilter;
-  defaultQuestionCount: number;
-  defaultRepetitionFilter?: RepetitionFilter;
-  defaultNewRatio?: NewPreviousRatio;
+  defaultQuestionCount: number; // 0 = All (continuous), or fixed count (e.g. 5, 10, 20, 30)
 }

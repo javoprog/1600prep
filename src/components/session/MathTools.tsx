@@ -60,6 +60,26 @@ function clampWindowPosition(
   };
 }
 
+let topFloatingWindowZ = 40;
+
+function useFloatingWindowZIndex(isOpen: boolean) {
+  const [zIndex, setZIndex] = useState<number>(40);
+
+  const bringToFront = useCallback(() => {
+    topFloatingWindowZ = Math.min(48, topFloatingWindowZ + 1);
+    setZIndex(topFloatingWindowZ);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      topFloatingWindowZ = Math.min(48, topFloatingWindowZ + 1);
+      setZIndex(topFloatingWindowZ);
+    }
+  }, [isOpen]);
+
+  return { zIndex, bringToFront };
+}
+
 function useIsMobileViewport(breakpoint = 640): boolean {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -251,6 +271,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isDesmosDark, setIsDesmosDark] = useState(true);
   const isMobileViewport = useIsMobileViewport();
+  const { zIndex, bringToFront } = useFloatingWindowZIndex(isOpen);
   const [bounds, setBounds] = useState<WindowBounds>({
     x: 24,
     y: 76,
@@ -515,6 +536,7 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
         top: `${bounds.y}px`,
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
+        zIndex,
       };
 
   return (
@@ -539,6 +561,9 @@ export const MathCalculatorPanel: React.FC<MathCalculatorPanelProps> = ({
 
       <div
         style={panelStyle}
+        onPointerDownCapture={
+          !isMobileViewport && !isDocked ? bringToFront : undefined
+        }
         className={`fixed flex flex-col bg-[#111113] select-none ${
           isMobileViewport
             ? 'inset-0 z-50 rounded-none border-0 shadow-none'
@@ -681,6 +706,7 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
   onClose,
 }) => {
   const isMobileViewport = useIsMobileViewport();
+  const { zIndex, bringToFront } = useFloatingWindowZIndex(isOpen);
   const { pos, isDragging, startDrag } = useDraggableWindow(
     {
       x:
@@ -702,8 +728,10 @@ export const MathReferenceSheet: React.FC<MathReferenceSheetProps> = ({
           : {
               left: `${pos.x}px`,
               top: `${pos.y}px`,
+              zIndex,
             }
       }
+      onPointerDownCapture={isMobileViewport ? undefined : bringToFront}
       className={
         isMobileViewport
           ? 'fixed inset-0 z-50 flex flex-col bg-[#111113] rounded-none border-0 shadow-none select-none'
@@ -950,6 +978,8 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
   isOpen,
   onClose,
 }) => {
+  const isMobileViewport = useIsMobileViewport();
+  const { zIndex, bringToFront } = useFloatingWindowZIndex(isOpen);
   const { pos, isDragging, startDrag } = useDraggableWindow(
     {
       x:
@@ -965,21 +995,35 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
 
   return (
     <div
-      style={{
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-      }}
-      className="fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none"
+      style={
+        isMobileViewport
+          ? undefined
+          : {
+              left: `${pos.x}px`,
+              top: `${pos.y}px`,
+              zIndex,
+            }
+      }
+      onPointerDownCapture={isMobileViewport ? undefined : bringToFront}
+      className={
+        isMobileViewport
+          ? 'fixed inset-0 z-50 flex flex-col bg-[#111113] rounded-none border-0 shadow-none select-none'
+          : 'fixed z-40 flex w-[580px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-148px)] sm:max-h-[calc(100vh-88px)] flex-col rounded-2xl border border-[#3F3F46] bg-[#111113] shadow-[0_24px_60px_rgba(0,0,0,0.75)] select-none'
+      }
       role="dialog"
       aria-label="Student-Produced Response Directions"
     >
       {/* Draggable Window Header */}
       <div
-        onPointerDown={startDrag}
-        className="flex items-center justify-between rounded-t-2xl border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 cursor-move"
+        onPointerDown={isMobileViewport ? undefined : startDrag}
+        className={`flex items-center justify-between border-b border-[#29292E] bg-[#18181B] px-4 py-2.5 ${
+          isMobileViewport ? '' : 'rounded-t-2xl cursor-move'
+        }`}
       >
         <div className="flex items-center gap-2">
-          <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          {!isMobileViewport && (
+            <GripHorizontal className="h-4 w-4 text-[#71717A]" />
+          )}
           <span className="text-xs font-semibold text-[#F5F5F5]">
             Student-Produced Response Directions
           </span>
@@ -1001,9 +1045,9 @@ export const SprDirectionsWindow: React.FC<SprDirectionsWindowProps> = ({
 
       {/* Best-Fit Directions Content with Larger Font Size */}
       <div
-        className={`overflow-y-auto rounded-b-2xl bg-[#111113] p-6 text-sm text-[#D4D4D8] space-y-5 select-text ${
-          isDragging ? 'pointer-events-none' : ''
-        }`}
+        className={`flex-1 overflow-y-auto bg-[#111113] p-6 text-sm text-[#D4D4D8] space-y-5 select-text ${
+          isMobileViewport ? '' : 'rounded-b-2xl'
+        } ${isDragging ? 'pointer-events-none' : ''}`}
       >
         <ul className="space-y-2.5 list-disc pl-5 leading-relaxed">
           <li>

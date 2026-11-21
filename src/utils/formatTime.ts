@@ -38,27 +38,32 @@ export function formatDateTime(epochMs: number): string {
 export function getDifficultyBadgeInfo(difficulty?: 'E' | 'M' | 'H' | null): {
   label: string;
   className: string;
+  dotColor: string;
 } {
   if (difficulty === 'E') {
     return {
       label: 'Easy',
-      className: 'bg-[#18181B] text-[#A1A1AA] border-[#29292E]',
+      className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+      dotColor: 'bg-emerald-400',
     };
   }
   if (difficulty === 'M') {
     return {
       label: 'Medium',
-      className: 'bg-[#18181B] text-[#FFFFFF] border-[#29292E]',
+      className: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+      dotColor: 'bg-amber-400',
     };
   }
   if (difficulty === 'H') {
     return {
       label: 'Hard',
-      className: 'bg-[#18181B] text-[#F5F5F5] border-[#3F3F46]',
+      className: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
+      dotColor: 'bg-rose-400',
     };
   }
   return {
     label: 'Standard',
     className: 'bg-[#18181B] text-[#71717A] border-[#29292E]',
+    dotColor: 'bg-[#71717A]',
   };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Plus, RotateCcw } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Button3D } from '@/components/ui/Button3D';
 import {
@@ -17,12 +17,13 @@ export const SessionSummary: React.FC = () => {
     setIsSessionSummaryView,
     goToQuestionIndex,
     startPracticeSession,
+    closeActiveSession,
+    triggerWizardReset,
     metaMap,
   } = useApp();
 
   if (!activeSession) return null;
 
-  const totalQuestions = activeSession.questionIds.length;
   const states = activeSession.questionIds.map(
     (id) => activeSession.questionStates[id]
   );
@@ -37,8 +38,11 @@ export const SessionSummary: React.FC = () => {
     answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
 
   const totalTimeMs = activeSession.totalTime;
+  const answeredTimeMs = states
+    .filter((s) => s?.isSubmitted)
+    .reduce((acc, s) => acc + (s?.timeSpent || 0), 0);
   const avgTimeMs =
-    answeredCount > 0 ? Math.round(totalTimeMs / answeredCount) : 0;
+    answeredCount > 0 ? Math.round(answeredTimeMs / answeredCount) : 0;
 
   const mistakeQuestionIds = activeSession.questionIds.filter((id) => {
     const st = activeSession.questionStates[id];
@@ -80,6 +84,11 @@ export const SessionSummary: React.FC = () => {
       `Mistakes Review — ${activeSession.title}`,
       mistakeQuestionIds
     );
+  };
+
+  const handleNewSession = () => {
+    closeActiveSession();
+    triggerWizardReset();
   };
 
   const encouragingLine =
@@ -160,9 +169,15 @@ export const SessionSummary: React.FC = () => {
               size="lg"
               onClick={handleReviewMistakes}
             >
+              <RotateCcw className="h-4 w-4" />
               <span>Retry Mistakes ({mistakeQuestionIds.length})</span>
             </Button3D>
           )}
+
+          <Button3D variant="secondary" size="lg" onClick={handleNewSession}>
+            <Plus className="h-4 w-4" />
+            <span>New Practice Session</span>
+          </Button3D>
         </div>
       </div>
 
